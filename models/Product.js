@@ -96,6 +96,11 @@ module.exports = (sequelize, DataTypes) => {
       allowNull: true,
       comment: 'Harvest regions as JSON array'
     },
+    harvest_region_image: {
+      type: DataTypes.STRING(200),
+      allowNull: true,
+      comment: 'Harvest region image path'
+    },
     peak_season_enabled: {
       type: DataTypes.BOOLEAN,
       allowNull: true,

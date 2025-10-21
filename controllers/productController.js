@@ -43,6 +43,20 @@ const formatImageUrls = (product, req) => {
     productData.image2_url = null;
   }
   
+  // Format harvest region image URL
+  if (productData.harvest_region_image) {
+    if (productData.harvest_region_image.startsWith('http')) {
+      productData.harvest_region_image_url = productData.harvest_region_image;
+    } else {
+      const cleanPath = productData.harvest_region_image.startsWith('uploads/') 
+        ? productData.harvest_region_image.substring(8) 
+        : productData.harvest_region_image;
+      productData.harvest_region_image_url = `${baseUrl}/uploads/${cleanPath}`;
+    }
+  } else {
+    productData.harvest_region_image_url = null;
+  }
+  
   return productData;
 };
 
@@ -156,20 +170,37 @@ const productController = {
     try {
       const {
         product_number,
-        product_name,
+        common_name,
+        botanical_name,
+        plant_part,
+        source_country,
+        harvest_region_new,
+        peak_season_enabled,
+        peak_season_months,
+        harvest_season_enabled,
+        harvest_season_months,
+        procurement_method,
+        main_components,
+        sensory_notes,
+        color_absolute,
+        extraction_process,
+        applications_uses,
+        production_availability,
         product_long_description,
         uom,
         product_short_description,
         product_group,
         status = 'active',
-        priority = 0,
-        additional,
-        additional2
+        priority = 0
       } = req.body;
+
+      // Use common_name as product_name if product_name is not provided
+      const product_name = req.body.product_name || common_name || product_number;
 
       // Handle uploaded images
       let product_image1 = req.body.product_image1 || null;
       let product_image2 = req.body.product_image2 || null;
+      let harvest_region_image = req.body.harvest_region_image || null;
 
       // If files were uploaded, use their paths
       if (req.files) {
@@ -179,11 +210,31 @@ const productController = {
         if (req.files.image2 && req.files.image2[0]) {
           product_image2 = `products/images/${req.files.image2[0].filename}`;
         }
+        if (req.files.harvest_region_image && req.files.harvest_region_image[0]) {
+          harvest_region_image = `products/harvest-regions/${req.files.harvest_region_image[0].filename}`;
+        }
       }
 
       const product = await Product.create({
         product_number,
         product_name,
+        common_name,
+        botanical_name,
+        plant_part,
+        source_country,
+        harvest_region_new,
+        harvest_region_image,
+        peak_season_enabled: peak_season_enabled === 'true' || peak_season_enabled === true,
+        peak_season_months,
+        harvest_season_enabled: harvest_season_enabled === 'true' || harvest_season_enabled === true,
+        harvest_season_months,
+        procurement_method,
+        main_components,
+        sensory_notes,
+        color_absolute,
+        extraction_process,
+        applications_uses,
+        production_availability,
         product_long_description,
         uom,
         product_short_description,
@@ -192,8 +243,6 @@ const productController = {
         product_group,
         status,
         priority,
-        additional,
-        additional2,
         created_date: new Date(),
         modified_date: new Date()
       });
@@ -228,6 +277,19 @@ const productController = {
       // Prepare update data
       const updateData = { ...req.body, modified_date: new Date() };
       
+      // Use common_name as product_name if product_name is not provided
+      if (!updateData.product_name && updateData.common_name) {
+        updateData.product_name = updateData.common_name;
+      }
+      
+      // Handle boolean conversions for season fields
+      if (typeof updateData.peak_season_enabled === 'string') {
+        updateData.peak_season_enabled = updateData.peak_season_enabled === 'true';
+      }
+      if (typeof updateData.harvest_season_enabled === 'string') {
+        updateData.harvest_season_enabled = updateData.harvest_season_enabled === 'true';
+      }
+      
       // Handle image uploads
       if (req.files) {
         if (req.files.image1 && req.files.image1[0]) {
@@ -245,6 +307,14 @@ const productController = {
           }
           updateData.product_image2 = `products/images/${req.files.image2[0].filename}`;
         }
+        
+        if (req.files.harvest_region_image && req.files.harvest_region_image[0]) {
+          // Delete old harvest region image if it exists
+          if (product.harvest_region_image) {
+            deleteOldImage(product.harvest_region_image);
+          }
+          updateData.harvest_region_image = `products/harvest-regions/${req.files.harvest_region_image[0].filename}`;
+        }
       }
 
       // Handle image removal flags
@@ -260,6 +330,13 @@ const productController = {
           deleteOldImage(product.product_image2);
         }
         updateData.product_image2 = null;
+      }
+      
+      if (req.body.remove_harvest_region_image === 'true') {
+        if (product.harvest_region_image) {
+          deleteOldImage(product.harvest_region_image);
+        }
+        updateData.harvest_region_image = null;
       }
 
       await product.update(updateData);

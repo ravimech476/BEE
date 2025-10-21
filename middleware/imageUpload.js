@@ -12,7 +12,13 @@ const ensureDirectoryExists = (dirPath) => {
 // Configure multer for file uploads
 const storage = multer.diskStorage({
   destination: (req, file, cb) => {
-    const uploadPath = path.join(__dirname, '../uploads/products/images');
+    // Determine upload path based on field name
+    let uploadPath;
+    if (file.fieldname === 'harvest_region_image') {
+      uploadPath = path.join(__dirname, '../uploads/products/harvest-regions');
+    } else {
+      uploadPath = path.join(__dirname, '../uploads/products/images');
+    }
     ensureDirectoryExists(uploadPath);
     cb(null, uploadPath);
   },
@@ -42,14 +48,15 @@ const upload = multer({
   fileFilter: fileFilter,
   limits: {
     fileSize: 5 * 1024 * 1024, // 5MB limit
-    files: 2 // Maximum 2 files (image1 and image2)
+    files: 3 // Maximum 3 files (image1, image2, and harvest_region_image)
   }
 });
 
 // Middleware for handling product image uploads
 const uploadProductImages = upload.fields([
   { name: 'image1', maxCount: 1 },
-  { name: 'image2', maxCount: 1 }
+  { name: 'image2', maxCount: 1 },
+  { name: 'harvest_region_image', maxCount: 1 }
 ]);
 
 // Error handling middleware for multer
@@ -64,7 +71,7 @@ const handleUploadError = (error, req, res, next) => {
     if (error.code === 'LIMIT_FILE_COUNT') {
       return res.status(400).json({
         success: false,
-        message: 'Too many files. Maximum 2 images allowed.'
+        message: 'Too many files. Maximum 3 images allowed.'
       });
     }
     return res.status(400).json({
