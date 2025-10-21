@@ -1,0 +1,272 @@
+'use strict';
+
+module.exports = {
+  up: async (queryInterface, Sequelize) => {
+    const now = new Date();
+    const statements = [
+      {
+        customer_code: 'CUST001',
+        customer_name: 'ABC Corporation Ltd.',
+        statement_date: new Date('2025-01-15'),
+        due_date: new Date('2025-02-15'),
+        opening_balance: 50000.00,
+        total_debit: 125000.00,
+        total_credit: 100000.00,
+        closing_balance: 75000.00,
+        status: 'pending',
+        payment_status: 'partial',
+        notes: 'Regular monthly statement. Partial payment received.',
+        created_date: now,
+        modified_date: now
+      },
+      {
+        customer_code: 'CUST002',
+        customer_name: 'XYZ Industries Pvt Ltd',
+        statement_date: new Date('2025-01-15'),
+        due_date: new Date('2025-02-15'),
+        opening_balance: 0.00,
+        total_debit: 85000.00,
+        total_credit: 85000.00,
+        closing_balance: 0.00,
+        status: 'paid',
+        payment_status: 'paid',
+        notes: 'Full payment received on time.',
+        created_date: now,
+        modified_date: now
+      },
+      {
+        customer_code: 'CUST003',
+        customer_name: 'Global Trading Co.',
+        statement_date: new Date('2025-01-10'),
+        due_date: new Date('2025-02-10'),
+        opening_balance: 150000.00,
+        total_debit: 200000.00,
+        total_credit: 50000.00,
+        closing_balance: 300000.00,
+        status: 'overdue',
+        payment_status: 'pending',
+        notes: 'Payment overdue by 15 days. Follow up required.',
+        created_date: now,
+        modified_date: now
+      },
+      {
+        customer_code: 'CUST004',
+        customer_name: 'Tech Solutions Ltd',
+        statement_date: new Date('2025-01-20'),
+        due_date: new Date('2025-02-20'),
+        opening_balance: 25000.00,
+        total_debit: 95000.00,
+        total_credit: 70000.00,
+        closing_balance: 50000.00,
+        status: 'pending',
+        payment_status: 'partial',
+        notes: 'Awaiting remaining payment.',
+        created_date: now,
+        modified_date: now
+      },
+      {
+        customer_code: 'CUST005',
+        customer_name: 'Manufacturing Hub Inc',
+        statement_date: new Date('2025-01-05'),
+        due_date: new Date('2025-02-05'),
+        opening_balance: 0.00,
+        total_debit: 175000.00,
+        total_credit: 175000.00,
+        closing_balance: 0.00,
+        status: 'paid',
+        payment_status: 'paid',
+        notes: 'Excellent payment history.',
+        created_date: now,
+        modified_date: now
+      },
+      {
+        customer_code: 'CUST006',
+        customer_name: 'Retail Chain Stores',
+        statement_date: new Date('2025-01-25'),
+        due_date: new Date('2025-02-25'),
+        opening_balance: 80000.00,
+        total_debit: 120000.00,
+        total_credit: 0.00,
+        closing_balance: 200000.00,
+        status: 'pending',
+        payment_status: 'pending',
+        notes: 'New statement generated. Payment reminder sent.',
+        created_date: now,
+        modified_date: now
+      },
+      {
+        customer_code: 'CUST007',
+        customer_name: 'Express Logistics',
+        statement_date: new Date('2025-01-18'),
+        due_date: new Date('2025-02-18'),
+        opening_balance: 45000.00,
+        total_debit: 65000.00,
+        total_credit: 90000.00,
+        closing_balance: 20000.00,
+        status: 'pending',
+        payment_status: 'partial',
+        notes: 'Credit note issued for returns.',
+        created_date: now,
+        modified_date: now
+      },
+      {
+        customer_code: 'CUST008',
+        customer_name: 'Construction Materials Co',
+        statement_date: new Date('2025-01-12'),
+        due_date: new Date('2025-02-12'),
+        opening_balance: 300000.00,
+        total_debit: 450000.00,
+        total_credit: 400000.00,
+        closing_balance: 350000.00,
+        status: 'overdue',
+        payment_status: 'partial',
+        notes: 'Large outstanding balance. CEO approval required for credit extension.',
+        created_date: now,
+        modified_date: now
+      },
+      {
+        customer_code: 'CUST009',
+        customer_name: 'Food & Beverages Ltd',
+        statement_date: new Date('2025-01-22'),
+        due_date: new Date('2025-02-22'),
+        opening_balance: 15000.00,
+        total_debit: 55000.00,
+        total_credit: 70000.00,
+        closing_balance: 0.00,
+        status: 'paid',
+        payment_status: 'paid',
+        notes: 'Advance payment received.',
+        created_date: now,
+        modified_date: now
+      },
+      {
+        customer_code: 'CUST010',
+        customer_name: 'Electronics Wholesale',
+        statement_date: new Date('2025-01-28'),
+        due_date: new Date('2025-02-28'),
+        opening_balance: 95000.00,
+        total_debit: 185000.00,
+        total_credit: 100000.00,
+        closing_balance: 180000.00,
+        status: 'pending',
+        payment_status: 'pending',
+        notes: 'Monthly reconciliation pending.',
+        created_date: now,
+        modified_date: now
+      }
+    ];
+
+    // Insert statement records
+    await queryInterface.bulkInsert('tbl_statements', statements, {});
+
+    // Now insert related transactions for each statement
+    const transactions = [];
+    
+    // Transactions for CUST001
+    transactions.push(
+      {
+        statement_id: 1,
+        transaction_date: new Date('2025-01-05'),
+        transaction_type: 'invoice',
+        reference_number: 'INV-2025-101',
+        description: 'Product delivery - Batch A',
+        debit_amount: 45000.00,
+        credit_amount: 0.00,
+        balance: 95000.00,
+        created_date: now,
+        modified_date: now
+      },
+      {
+        statement_id: 1,
+        transaction_date: new Date('2025-01-10'),
+        transaction_type: 'invoice',
+        reference_number: 'INV-2025-105',
+        description: 'Product delivery - Batch B',
+        debit_amount: 80000.00,
+        credit_amount: 0.00,
+        balance: 175000.00,
+        created_date: now,
+        modified_date: now
+      },
+      {
+        statement_id: 1,
+        transaction_date: new Date('2025-01-12'),
+        transaction_type: 'payment',
+        reference_number: 'PAY-2025-050',
+        description: 'Payment received - Bank transfer',
+        debit_amount: 0.00,
+        credit_amount: 100000.00,
+        balance: 75000.00,
+        created_date: now,
+        modified_date: now
+      }
+    );
+
+    // Transactions for CUST002
+    transactions.push(
+      {
+        statement_id: 2,
+        transaction_date: new Date('2025-01-08'),
+        transaction_type: 'invoice',
+        reference_number: 'INV-2025-108',
+        description: 'Service charges - January',
+        debit_amount: 85000.00,
+        credit_amount: 0.00,
+        balance: 85000.00,
+        created_date: now,
+        modified_date: now
+      },
+      {
+        statement_id: 2,
+        transaction_date: new Date('2025-01-14'),
+        transaction_type: 'payment',
+        reference_number: 'PAY-2025-055',
+        description: 'Full payment - Check #1234',
+        debit_amount: 0.00,
+        credit_amount: 85000.00,
+        balance: 0.00,
+        created_date: now,
+        modified_date: now
+      }
+    );
+
+    // Transactions for CUST003
+    transactions.push(
+      {
+        statement_id: 3,
+        transaction_date: new Date('2025-01-02'),
+        transaction_type: 'invoice',
+        reference_number: 'INV-2025-090',
+        description: 'Bulk order - Electronics',
+        debit_amount: 200000.00,
+        credit_amount: 0.00,
+        balance: 350000.00,
+        created_date: now,
+        modified_date: now
+      },
+      {
+        statement_id: 3,
+        transaction_date: new Date('2025-01-08'),
+        transaction_type: 'payment',
+        reference_number: 'PAY-2025-045',
+        description: 'Partial payment',
+        debit_amount: 0.00,
+        credit_amount: 50000.00,
+        balance: 300000.00,
+        created_date: now,
+        modified_date: now
+      }
+    );
+
+    // Insert all transactions
+    if (transactions.length > 0) {
+      await queryInterface.bulkInsert('tbl_statement_transactions', transactions, {});
+    }
+  },
+
+  down: async (queryInterface, Sequelize) => {
+    // Delete in reverse order due to foreign key constraints
+    await queryInterface.bulkDelete('tbl_statement_transactions', null, {});
+    await queryInterface.bulkDelete('tbl_statements', null, {});
+  }
+};

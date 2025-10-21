@@ -1,0 +1,52 @@
+{
+  "name": "customer-connect-api",
+  "version": "1.0.0",
+  "description": "Customer Connect API with MSSQL and Sequelize",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "start:no-sync": "node server-no-sync.js",
+    "dev": "nodemon server.js",
+    "dev:no-sync": "nodemon server-no-sync.js",
+    "test-db": "node test-db.js",
+    "test-connection": "node test-db-connection.js",
+    "test-jwt": "node test-jwt.js",
+    "check-db": "node check-database.js",
+    "check-tables": "node check-table-structure.js",
+    "setup-db": "node setup-database.js",
+    "setup-db-manual": "node setup-database-manual.js",
+    "migrate": "sequelize-cli db:migrate",
+    "migrate:undo": "sequelize-cli db:migrate:undo",
+    "seed": "sequelize-cli db:seed:all",
+    "seed:undo": "sequelize-cli db:seed:undo:all",
+    "reset-db": "npm run migrate:undo && npm run migrate && npm run seed"
+  },
+  "dependencies": {
+    "bcryptjs": "^2.4.3",
+    "cors": "^2.8.5",
+    "dotenv": "^16.3.1",
+    "express": "^4.18.2",
+    "express-rate-limit": "^7.1.5",
+    "express-validator": "^7.0.1",
+    "helmet": "^7.1.0",
+    "jsonwebtoken": "^9.0.2",
+    "morgan": "^1.10.0",
+    "multer": "^1.4.5-lts.1",
+    "pm2": "^6.0.13",
+    "sequelize": "^6.35.2",
+    "tedious": "^16.7.1"
+  },
+  "devDependencies": {
+    "nodemon": "^3.0.2",
+    "sequelize-cli": "^6.6.2"
+  },
+  "keywords": [
+    "node",
+    "express",
+    "sequelize",
+    "mssql",
+    "api"
+  ],
+  "author": "Customer Connect Team",
+  "license": "MIT"
+}

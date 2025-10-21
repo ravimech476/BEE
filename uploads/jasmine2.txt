@@ -1,0 +1,12 @@
+# Sample Image Placeholder
+
+This is a placeholder for jasmine2.jpg
+
+You can replace this file with an actual image of Jasmine Grandiflorum flowers.
+
+The image should be:
+- JPEG, PNG, GIF, or WebP format
+- Maximum 5MB file size
+- Recommended dimensions: 800x600 pixels
+
+This placeholder will be served at: http://localhost:5000/uploads/jasmine2.jpg
