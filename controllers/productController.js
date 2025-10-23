@@ -404,6 +404,71 @@ const productController = {
     }
   },
 
+  // Get top products by sales amount with priority fallback
+  getTopProductsBySales: async (req, res, next) => {
+    try {
+      const { limit = 3, customer_code } = req.query;
+      const { Order } = require('../models');
+      const sequelize = Product.sequelize;
+
+      // Build the query for SQL Server using subquery to avoid TEXT fields in GROUP BY
+      const replacements = { limit: parseInt(limit) };
+      
+      let whereClause = '';
+      if (customer_code) {
+        whereClause = ` AND (o.customer_code = :customer_code OR o.customer_code IS NULL)`;
+        replacements.customer_code = customer_code;
+      }
+
+      // Use subquery: first aggregate sales by product_id, then join back to get all product details
+      const query = `
+        SELECT TOP (:limit)
+          p.*,
+          ISNULL(sales.total_sales, 0) as total_sales,
+          ISNULL(sales.order_count, 0) as order_count
+        FROM tbl_products p
+        LEFT JOIN (
+          SELECT 
+            COALESCE(o.product_id, p2.id) as product_id,
+            SUM(CASE WHEN o.status NOT IN ('cancelled') THEN o.amount ELSE 0 END) as total_sales,
+            COUNT(CASE WHEN o.status NOT IN ('cancelled') THEN o.id ELSE NULL END) as order_count
+          FROM orders o
+          LEFT JOIN tbl_products p2 ON (o.product_name = p2.product_name OR o.product_id = p2.id)
+          WHERE o.status NOT IN ('cancelled')
+          ${whereClause.replace('o.customer_code', 'o.customer_code')}
+          GROUP BY COALESCE(o.product_id, p2.id)
+        ) sales ON p.id = sales.product_id
+        WHERE p.status = 'active'
+        ORDER BY 
+          CASE 
+            WHEN ISNULL(sales.total_sales, 0) > 0 THEN sales.total_sales
+            ELSE p.priority 
+          END DESC
+      `;
+
+      const products = await sequelize.query(query, {
+        replacements,
+        type: sequelize.QueryTypes.SELECT
+      });
+
+      // Format products with image URLs
+      const productsWithImages = products.map(product => formatImageUrls({
+        toJSON: () => product
+      }, req));
+
+      res.json({
+        success: true,
+        data: {
+          products: productsWithImages,
+          total: products.length
+        }
+      });
+    } catch (error) {
+      console.error('Error fetching top products by sales:', error);
+      next(error);
+    }
+  },
+
   // Bulk update product status (Admin only)
   bulkUpdateStatus: async (req, res, next) => {
     try {

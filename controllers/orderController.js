@@ -66,6 +66,7 @@ const orderController = {
   async getOrderStats(req, res) {
     try {
       const sequelize = Order.sequelize;
+      const { InvoiceToDelivery } = require('../models');
       
       // Total orders
       const totalOrders = await Order.count();
@@ -78,6 +79,11 @@ const orderController = {
       // Pending orders
       const pendingOrders = await Order.count({
         where: { status: 'pending' }
+      });
+      
+      // Dispatched count from InvoiceToDelivery table
+      const dispatchedOrders = await InvoiceToDelivery.count({
+        where: { status: 'dispatched' }
       });
       
       // This month's orders using raw query to avoid date conversion issues
@@ -111,6 +117,7 @@ const orderController = {
         totalOrders,
         totalAmount: totalRevenue || 0,
         pendingOrders,
+        dispatchedOrders: dispatchedOrders || 0,
         thisMonthOrders: thisMonthOrdersResult?.count || 0,
         thisMonthAmount: thisMonthRevenueResult?.total || 0
       });

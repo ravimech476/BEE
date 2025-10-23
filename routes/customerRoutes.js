@@ -26,32 +26,47 @@ router.get('/:customerCode/order-stats', authMiddleware, async (req, res) => {
       whereCondition.customer_code = customerCode;
     }
 
-    const stats = await Order.findAll({
+    // Get order statistics from Orders table
+    const orderStats = await Order.findAll({
       where: whereCondition,
       attributes: [
         [sequelize.fn('COUNT', sequelize.col('id')), 'total_orders'],
         [sequelize.fn('SUM', sequelize.col('amount')), 'total_amount'],
-        [sequelize.fn('COUNT', sequelize.literal("CASE WHEN status = 'delivered' THEN 1 END")), 'dispatched_orders'],
-        [sequelize.fn('COUNT', sequelize.literal("CASE WHEN status = 'pending' THEN 1 END")), 'pending_orders']
+        [sequelize.fn('COUNT', sequelize.literal("CASE WHEN status IN ('pending', 'processing') THEN 1 END")), 'pending_orders']
       ],
       raw: true
     });
 
-    const result = stats[0] || {
+    // Get dispatch count from InvoiceToDelivery table where status = 'dispatched'
+    const dispatchStats = await InvoiceToDelivery.findAll({
+      where: {
+        customer_code: whereCondition.customer_code,
+        status: 'dispatched'
+      },
+      attributes: [
+        [sequelize.fn('COUNT', sequelize.col('sl_no')), 'dispatched_count']
+      ],
+      raw: true
+    });
+
+    const orderResult = orderStats[0] || {
       total_orders: 0,
       total_amount: 0,
-      dispatched_orders: 0,
       pending_orders: 0
+    };
+
+    const dispatchResult = dispatchStats[0] || {
+      dispatched_count: 0
     };
 
     res.json({
       success: true,
       data: {
-        total: parseInt(result.total_orders) || 0,
-        totalAmount: parseFloat(result.total_amount) || 0,
+        total: parseInt(orderResult.total_orders) || 0,
+        totalAmount: parseFloat(orderResult.total_amount) || 0,
         byStatus: {
-          dispatched: parseInt(result.dispatched_orders) || 0,
-          pending: parseInt(result.pending_orders) || 0
+          dispatched: parseInt(dispatchResult.dispatched_count) || 0,
+          pending: parseInt(orderResult.pending_orders) || 0
         }
       }
     });

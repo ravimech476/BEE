@@ -57,6 +57,7 @@ router.use(logPageAccess);
 
 // Routes accessible by both admin and customer
 router.get('/', productController.getAllProducts);
+router.get('/top/by-sales', productController.getTopProductsBySales); // Add BEFORE /:id route
 router.get('/groups', productController.getProductGroups);
 router.get('/:id', productController.getProductById);
 
