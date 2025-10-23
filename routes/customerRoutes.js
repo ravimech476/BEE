@@ -10,63 +10,53 @@ router.get('/:customerCode/order-stats', authMiddleware, async (req, res) => {
   try {
     const { customerCode } = req.params;
     
-    // Add customer filter based on user type
-    let whereCondition = {};
-    if (req.user.role === 'customer') {
-      whereCondition.customer_code = req.user.customer_code;
-      
-      // Ensure customer can only access their own data
-      if (customerCode !== req.user.customer_code) {
-        return res.status(403).json({
-          success: false,
-          message: 'Access denied'
-        });
-      }
-    } else {
-      whereCondition.customer_code = customerCode;
+    // Security check for customer users
+    if (req.user.role === 'customer' && customerCode !== req.user.customer_code) {
+      return res.status(403).json({
+        success: false,
+        message: 'Access denied'
+      });
     }
 
-    // Get order statistics from Orders table
-    const orderStats = await Order.findAll({
-      where: whereCondition,
-      attributes: [
-        [sequelize.fn('COUNT', sequelize.col('id')), 'total_orders'],
-        [sequelize.fn('SUM', sequelize.col('amount')), 'total_amount'],
-        [sequelize.fn('COUNT', sequelize.literal("CASE WHEN status IN ('pending', 'processing') THEN 1 END")), 'pending_orders']
-      ],
-      raw: true
-    });
+    // Build customer filter
+    const customerFilter = req.user.role === 'customer' ? req.user.customer_code : customerCode;
 
-    // Get dispatch count from InvoiceToDelivery table where status = 'dispatched'
-    const dispatchStats = await InvoiceToDelivery.findAll({
-      where: {
-        customer_code: whereCondition.customer_code,
-        status: 'dispatched'
-      },
-      attributes: [
-        [sequelize.fn('COUNT', sequelize.col('sl_no')), 'dispatched_count']
-      ],
-      raw: true
-    });
+    // Get order statistics from d2d_sales table
+    const [orderStats] = await sequelize.query(
+      `SELECT
+         COUNT(DISTINCT id) AS TotalOrders,
+        SUM(qty) AS TotalQuantity,
+        SUM(net_amount) AS TotalValue
+      FROM [customerconnect].[dbo].[d2d_sales]
+      WHERE customer_code = :customerCode`,
+      {
+        replacements: { customerCode: customerFilter },
+        type: sequelize.QueryTypes.SELECT
+      }
+    );
 
-    const orderResult = orderStats[0] || {
-      total_orders: 0,
-      total_amount: 0,
-      pending_orders: 0
-    };
-
-    const dispatchResult = dispatchStats[0] || {
-      dispatched_count: 0
-    };
+    // Get dispatch count by matching d2d_sales.billing_doc_no with d2d_dispatch_entry.invoice_no
+    const [dispatchStats] = await sequelize.query(
+      `SELECT COUNT(DISTINCT s.billing_doc_no) as DispatchedCount
+      FROM [customerconnect].[dbo].[d2d_sales] s
+      INNER JOIN [customerconnect].[dbo].[d2d_dispatch_entry] d 
+        ON s.billing_doc_no = d.invoice_no
+      WHERE s.customer_code = :customerCode`,
+      {
+        replacements: { customerCode: customerFilter },
+        type: sequelize.QueryTypes.SELECT
+      }
+    );
 
     res.json({
       success: true,
       data: {
-        total: parseInt(orderResult.total_orders) || 0,
-        totalAmount: parseFloat(orderResult.total_amount) || 0,
+        total: parseInt(orderStats.TotalOrders) || 0,
+        totalAmount: parseFloat(orderStats.TotalValue) || 0,
+        totalQuantity: parseInt(orderStats.TotalQuantity) || 0,
         byStatus: {
-          dispatched: parseInt(dispatchResult.dispatched_count) || 0,
-          pending: parseInt(orderResult.pending_orders) || 0
+          dispatched: parseInt(dispatchStats.DispatchedCount) || 0,
+          pending: (parseInt(orderStats.TotalOrders) || 0) - (parseInt(dispatchStats.DispatchedCount) || 0)
         }
       }
     });

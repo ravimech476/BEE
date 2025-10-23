@@ -405,46 +405,62 @@ const productController = {
   },
 
   // Get top products by sales amount with priority fallback
+ // Get top products by sales amount with priority fallback
+// Get top products by sales amount with priority fallback
+  // REPLACE THE getTopProductsBySales FUNCTION WITH THIS CODE:
+
+  // Get top products by sales amount with priority fallback
   getTopProductsBySales: async (req, res, next) => {
     try {
       const { limit = 3, customer_code } = req.query;
-      const { Order } = require('../models');
       const sequelize = Product.sequelize;
 
-      // Build the query for SQL Server using subquery to avoid TEXT fields in GROUP BY
-      const replacements = { limit: parseInt(limit) };
+      const limitValue = parseInt(limit);
       
-      let whereClause = '';
-      if (customer_code) {
-        whereClause = ` AND (o.customer_code = :customer_code OR o.customer_code IS NULL)`;
-        replacements.customer_code = customer_code;
-      }
+      let query, replacements;
 
-      // Use subquery: first aggregate sales by product_id, then join back to get all product details
-      const query = `
-        SELECT TOP (:limit)
-          p.*,
-          ISNULL(sales.total_sales, 0) as total_sales,
-          ISNULL(sales.order_count, 0) as order_count
-        FROM tbl_products p
-        LEFT JOIN (
-          SELECT 
-            COALESCE(o.product_id, p2.id) as product_id,
-            SUM(CASE WHEN o.status NOT IN ('cancelled') THEN o.amount ELSE 0 END) as total_sales,
-            COUNT(CASE WHEN o.status NOT IN ('cancelled') THEN o.id ELSE NULL END) as order_count
-          FROM orders o
-          LEFT JOIN tbl_products p2 ON (o.product_name = p2.product_name OR o.product_id = p2.id)
-          WHERE o.status NOT IN ('cancelled')
-          ${whereClause.replace('o.customer_code', 'o.customer_code')}
-          GROUP BY COALESCE(o.product_id, p2.id)
-        ) sales ON p.id = sales.product_id
-        WHERE p.status = 'active'
-        ORDER BY 
-          CASE 
-            WHEN ISNULL(sales.total_sales, 0) > 0 THEN sales.total_sales
-            ELSE p.priority 
-          END DESC
-      `;
+      if (customer_code) {
+        // Query with customer filter using d2d_sales
+        query = `
+          WITH ProductSummary AS (
+            SELECT
+              material_no,
+              SUM(TRY_CAST(qty AS FLOAT)) AS ProductQuantity,
+              SUM(TRY_CAST(net_amount AS FLOAT)) AS ProductTotalValue
+            FROM [customerconnect].[dbo].[d2d_sales]
+            WHERE customer_code = :customer_code
+            GROUP BY material_no
+          )
+          SELECT TOP (:limit)
+            p.*,
+            ISNULL(ps.ProductQuantity, 0) as ProductQuantity,
+            ISNULL(ps.ProductTotalValue, 0) as ProductTotalValue,
+            CASE WHEN ps.material_no IS NOT NULL THEN 1 ELSE 2 END as match_priority
+          FROM tbl_products p
+          LEFT JOIN ProductSummary ps ON p.product_number = ps.material_no
+          WHERE p.status = 'active'
+          ORDER BY 
+            CASE WHEN ps.material_no IS NOT NULL THEN 1 ELSE 2 END ASC,
+            CASE 
+              WHEN ps.material_no IS NOT NULL THEN ISNULL(ps.ProductTotalValue, 0)
+              ELSE ISNULL(p.priority, 0)
+            END DESC
+        `;
+        replacements = { limit: limitValue, customer_code };
+      } else {
+        // Query without customer filter - just use priority
+        query = `
+          SELECT TOP (:limit)
+            p.*,
+            0 as ProductQuantity,
+            0 as ProductTotalValue,
+            2 as match_priority
+          FROM tbl_products p
+          WHERE p.status = 'active'
+          ORDER BY ISNULL(p.priority, 0) DESC
+        `;
+        replacements = { limit: limitValue };
+      }
 
       const products = await sequelize.query(query, {
         replacements,
@@ -465,9 +481,20 @@ const productController = {
       });
     } catch (error) {
       console.error('Error fetching top products by sales:', error);
+      console.error('Error details:', error.message);
       next(error);
     }
   },
+
+
+// KEY CHANGES MADE:
+// 1. Used TRY_CAST instead of CAST to handle data type issues gracefully
+// 2. Simplified the query - removed complex CTEs and UNION
+// 3. Used LEFT JOIN instead of INNER JOIN + separate priority query
+// 4. Used p.* to select all product columns (avoids listing each column)
+// 5. Added better error logging with error.message
+// 6. Separate query paths for with/without customer_code
+// 7. Used :parameter syntax consistently (Sequelize handles conversion)
 
   // Bulk update product status (Admin only)
   bulkUpdateStatus: async (req, res, next) => {
