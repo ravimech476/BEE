@@ -62,64 +62,65 @@ const orderController = {
     }
   },
 
-  // Get order statistics
+  // Get order statistics (Admin - All Orders without customer filter)
   async getOrderStats(req, res) {
     try {
       const sequelize = Order.sequelize;
-      const { InvoiceToDelivery } = require('../models');
       
-      // Total orders
-      const totalOrders = await Order.count();
-      
-      // Total revenue
-      const totalRevenue = await Order.sum('amount', {
-        where: { status: { [Op.ne]: 'cancelled' } }
-      });
-      
-      // Pending orders
-      const pendingOrders = await Order.count({
-        where: { status: 'pending' }
-      });
-      
-      // Dispatched count from InvoiceToDelivery table
-      const dispatchedOrders = await InvoiceToDelivery.count({
-        where: { status: 'dispatched' }
-      });
-      
-      // This month's orders using raw query to avoid date conversion issues
-      const now = new Date();
-      const year = now.getFullYear();
-      const month = now.getMonth() + 1; // JavaScript months are 0-based
-      
-      const [thisMonthOrdersResult] = await sequelize.query(
-        `SELECT COUNT(*) as count FROM orders 
-         WHERE YEAR(invoice_date) = :year 
-         AND MONTH(invoice_date) = :month`,
+      // Get order statistics from d2d_sales table (ALL orders - no customer filter)
+      const [orderStats] = await sequelize.query(
+        `SELECT
+          COUNT(DISTINCT id) AS TotalOrders,
+          SUM(qty) AS TotalQuantity,
+          SUM(net_amount) AS TotalValue
+        FROM [customerconnect].[dbo].[d2d_sales]`,
         {
-          replacements: { year, month },
-          type: sequelize.QueryTypes.SELECT
-        }
-      );
-      
-      // This month's revenue
-      const [thisMonthRevenueResult] = await sequelize.query(
-        `SELECT SUM(amount) as total FROM orders 
-         WHERE YEAR(invoice_date) = :year 
-         AND MONTH(invoice_date) = :month 
-         AND status != 'cancelled'`,
-        {
-          replacements: { year, month },
           type: sequelize.QueryTypes.SELECT
         }
       );
 
+      // Get dispatch count by matching d2d_sales.billing_doc_no with d2d_dispatch_entry.invoice_no
+      const [dispatchStats] = await sequelize.query(
+        `SELECT COUNT(DISTINCT s.billing_doc_no) as DispatchedCount
+        FROM [customerconnect].[dbo].[d2d_sales] s
+        INNER JOIN [customerconnect].[dbo].[d2d_dispatch_entry] d 
+          ON s.billing_doc_no = d.invoice_no`,
+        {
+          type: sequelize.QueryTypes.SELECT
+        }
+      );
+
+      // Get this month's orders
+      const currentMonth = new Date();
+      currentMonth.setDate(1);
+      currentMonth.setHours(0, 0, 0, 0);
+      const currentMonthStr = currentMonth.toISOString().split('T')[0];
+
+      const [thisMonthStats] = await sequelize.query(
+        `SELECT
+          COUNT(DISTINCT id) AS ThisMonthOrders,
+          SUM(net_amount) AS ThisMonthAmount
+        FROM [customerconnect].[dbo].[d2d_sales]
+        WHERE bill_date >= :currentMonth`,
+        {
+          replacements: { currentMonth: currentMonthStr },
+          type: sequelize.QueryTypes.SELECT
+        }
+      );
+
+      const totalOrders = parseInt(orderStats.TotalOrders) || 0;
+      const dispatchedCount = parseInt(dispatchStats.DispatchedCount) || 0;
+
       res.json({
-        totalOrders,
-        totalAmount: totalRevenue || 0,
-        pendingOrders,
-        dispatchedOrders: dispatchedOrders || 0,
-        thisMonthOrders: thisMonthOrdersResult?.count || 0,
-        thisMonthAmount: thisMonthRevenueResult?.total || 0
+        totalOrders: totalOrders,
+        totalAmount: parseFloat(orderStats.TotalValue) || 0,
+        totalQuantity: parseInt(orderStats.TotalQuantity) || 0,
+        pendingOrders: totalOrders - dispatchedCount,
+        completedOrders: dispatchedCount,
+        dispatchedOrders: dispatchedCount,
+        cancelledOrders: 0,
+        thisMonthOrders: parseInt(thisMonthStats.ThisMonthOrders) || 0,
+        thisMonthAmount: parseFloat(thisMonthStats.ThisMonthAmount) || 0
       });
     } catch (error) {
       console.error('Error fetching order stats:', error);
