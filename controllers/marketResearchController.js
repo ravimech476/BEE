@@ -47,11 +47,9 @@ const upload = multer({
   }
 });
 
-// Middleware for handling file uploads
+// Middleware for handling file uploads (only research_image1 now)
 const uploadFields = upload.fields([
-  { name: 'research_image1', maxCount: 1 },
-  { name: 'research_image2', maxCount: 1 },
-  { name: 'document', maxCount: 1 }
+  { name: 'research_image1', maxCount: 1 }
 ]);
 
 const marketResearchController = {
@@ -70,12 +68,10 @@ const marketResearchController = {
       const offset = (page - 1) * limit;
       const whereClause = {};
 
-      // Add search condition
+      // Add search condition (search by title only now)
       if (search) {
         whereClause[Op.or] = [
-          { research_name: { [Op.like]: `%${search}%` } },
-          { research_title: { [Op.like]: `%${search}%` } },
-          { research_short_description: { [Op.like]: `%${search}%` } }
+          { research_title: { [Op.like]: `%${search}%` } }
         ];
       }
 
@@ -142,43 +138,33 @@ const marketResearchController = {
     }
   },
 
-  // Create new market research (Admin only)
+  // Create new market research (Admin only) - SIMPLIFIED VERSION
   createMarketResearch: async (req, res, next) => {
     try {
       const {
-        research_number,
-        research_name,
         research_title,
-        research_long_description,
-        video_link,
-        research_short_description,
+        research_number = `MR-${Date.now()}`, // Auto-generate if not provided
+        research_name = research_title || `Research ${Date.now()}`, // Use title as name
         status = 'active',
         priority = 0
       } = req.body;
 
-      // Handle file uploads
+      // Handle file upload (only research_image1)
       const research_image1 = req.files?.research_image1?.[0]
         ? `/uploads/market-research/${req.files.research_image1[0].filename}`
-        : req.body.research_image1 || null;
+        : null;
 
-      const research_image2 = req.files?.research_image2?.[0]
-        ? `/uploads/market-research/${req.files.research_image2[0].filename}`
-        : req.body.research_image2 || null;
-
-      const document = req.files?.document?.[0]
-        ? `/uploads/market-research/${req.files.document[0].filename}`
-        : req.body.document || null;
-      const video_links = req.body.video_link || null;
       const research = await MarketResearch.create({
         research_number,
         research_name,
         research_title,
-        research_long_description,
-        video_links,
-        research_short_description,
         research_image1,
-        research_image2,
-        document,
+        // Set all other fields as null
+        research_long_description: null,
+        video_link: null,
+        research_short_description: null,
+        research_image2: null,
+        document: null,
         status,
         priority,
         created_date: new Date(),
@@ -194,23 +180,18 @@ const marketResearchController = {
       });
     } catch (error) {
       // Clean up uploaded files if error occurs
-      if (req.files) {
-        const files = [...(req.files.research_image1 || []),
-        ...(req.files.research_image2 || []),
-        ...(req.files.document || [])];
-        for (const file of files) {
-          try {
-            await fs.unlink(file.path);
-          } catch (unlinkError) {
-            console.error('Error deleting file:', unlinkError);
-          }
+      if (req.files?.research_image1?.[0]) {
+        try {
+          await fs.unlink(req.files.research_image1[0].path);
+        } catch (unlinkError) {
+          console.error('Error deleting file:', unlinkError);
         }
       }
       next(error);
     }
   },
 
-  // Update market research (Admin only)
+  // Update market research (Admin only) - SIMPLIFIED VERSION
   updateMarketResearch: async (req, res, next) => {
     try {
       const { id } = req.params;
@@ -224,60 +205,33 @@ const marketResearchController = {
         });
       }
 
-      // Handle file uploads and existing file retention
+      // Handle file upload and existing file retention (only research_image1)
       const research_image1 = req.files?.research_image1?.[0]
         ? `/uploads/market-research/${req.files.research_image1[0].filename}`
-        : (req.body.existing_research_image1 || req.body.research_image1 || null);
+        : (req.body.existing_research_image1 || research.research_image1);
 
-      const research_image2 = req.files?.research_image2?.[0]
-        ? `/uploads/market-research/${req.files.research_image2[0].filename}`
-        : (req.body.existing_research_image2 || req.body.research_image2 || null);
-
-      const document = req.files?.document?.[0]
-        ? `/uploads/market-research/${req.files.document[0].filename}`
-        : (req.body.existing_document || req.body.document || null);
-
-      // Delete old files if new ones are uploaded
+      // Delete old file if new one is uploaded
       if (req.files?.research_image1?.[0] && research.research_image1) {
         try {
           const oldPath = path.join(__dirname, '..', research.research_image1);
           await fs.unlink(oldPath);
         } catch (error) {
-          console.error('Error deleting old image1:', error);
+          console.error('Error deleting old image:', error);
         }
       }
 
-      if (req.files?.research_image2?.[0] && research.research_image2) {
-        try {
-          const oldPath = path.join(__dirname, '..', research.research_image2);
-          await fs.unlink(oldPath);
-        } catch (error) {
-          console.error('Error deleting old image2:', error);
-        }
-      }
+      // Get the new title or keep existing
+      const research_title = req.body.research_title || research.research_title;
 
-      if (req.files?.document?.[0] && research.document) {
-        try {
-          const oldPath = path.join(__dirname, '..', research.document);
-          await fs.unlink(oldPath);
-        } catch (error) {
-          console.error('Error deleting old document:', error);
-        }
-      }
-
+      // Update only the allowed fields but keep required fields
       const updateData = {
-        ...req.body,
+        research_number: research.research_number, // Keep existing
+        research_name: research_title, // Update to match title
+        research_title: research_title,
         research_image1,
-        research_image2,
-        document,
         modified_date: new Date(),
         modified_by: req.user.username
       };
-
-      // Remove file-related fields that shouldn't be in the update
-      delete updateData.existing_research_image1;
-      delete updateData.existing_research_image2;
-      delete updateData.existing_document;
 
       await research.update(updateData);
 
@@ -290,16 +244,11 @@ const marketResearchController = {
       });
     } catch (error) {
       // Clean up uploaded files if error occurs
-      if (req.files) {
-        const files = [...(req.files.research_image1 || []),
-        ...(req.files.research_image2 || []),
-        ...(req.files.document || [])];
-        for (const file of files) {
-          try {
-            await fs.unlink(file.path);
-          } catch (unlinkError) {
-            console.error('Error deleting file:', unlinkError);
-          }
+      if (req.files?.research_image1?.[0]) {
+        try {
+          await fs.unlink(req.files.research_image1[0].path);
+        } catch (unlinkError) {
+          console.error('Error deleting file:', unlinkError);
         }
       }
       next(error);
@@ -318,6 +267,16 @@ const marketResearchController = {
           success: false,
           message: 'Market research not found'
         });
+      }
+
+      // Delete associated files before deleting the record
+      if (research.research_image1) {
+        try {
+          const imagePath = path.join(__dirname, '..', research.research_image1);
+          await fs.unlink(imagePath);
+        } catch (error) {
+          console.error('Error deleting image file:', error);
+        }
       }
 
       await research.destroy();

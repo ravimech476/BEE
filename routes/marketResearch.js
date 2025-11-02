@@ -7,26 +7,13 @@ const logPageAccess = require('../middleware/pageLogger');
 
 const router = express.Router();
 
-// Validation rules
-const marketResearchValidation = [
-  body('research_number')
-    .notEmpty()
-    .withMessage('Research number is required')
-    .isLength({ max: 100 })
-    .withMessage('Research number must not exceed 100 characters'),
-  body('research_name')
-    .notEmpty()
-    .withMessage('Research name is required')
-    .isLength({ max: 250 })
-    .withMessage('Research name must not exceed 250 characters'),
+// Validation rules for CREATE - research_number and research_name are optional (auto-generated)
+const createMarketResearchValidation = [
   body('research_title')
-    .optional()
+    .notEmpty()
+    .withMessage('Research title is required')
     .isLength({ max: 500 })
     .withMessage('Research title must not exceed 500 characters'),
-  // body('video_link')
-  //   .optional()
-  //   .isURL()
-  //   .withMessage('Video link must be a valid URL'),
   body('status')
     .optional()
     .isIn(['active', 'inactive'])
@@ -35,6 +22,15 @@ const marketResearchValidation = [
     .optional()
     .isInt({ min: 0 })
     .withMessage('Priority must be a non-negative integer')
+];
+
+// Validation rules for UPDATE - only title is required
+const updateMarketResearchValidation = [
+  body('research_title')
+    .notEmpty()
+    .withMessage('Research title is required')
+    .isLength({ max: 500 })
+    .withMessage('Research title must not exceed 500 characters')
 ];
 
 // Apply authentication and page logging to all routes
@@ -48,8 +44,8 @@ router.get('/latest', marketResearchController.getLatestMarketResearch);
 router.get('/:id', marketResearchController.getMarketResearchById);
 
 // Admin only routes
-router.post('/', adminMiddleware, uploadFields, marketResearchValidation, validate, marketResearchController.createMarketResearch);
-router.put('/:id', adminMiddleware, uploadFields, marketResearchValidation, validate, marketResearchController.updateMarketResearch);
+router.post('/', adminMiddleware, uploadFields, createMarketResearchValidation, validate, marketResearchController.createMarketResearch);
+router.put('/:id', adminMiddleware, uploadFields, updateMarketResearchValidation, validate, marketResearchController.updateMarketResearch);
 router.delete('/:id', adminMiddleware, marketResearchController.deleteMarketResearch);
 
 module.exports = router;
