@@ -126,7 +126,49 @@ router.get('/:customerCode/orders', authMiddleware, async (req, res) => {
     });
   } catch (error) {
     console.error('Error fetching customer orders:', error);
+    re// Get specific order details for customer
+router.get('/:customerCode/orders/:id', authMiddleware, async (req, res) => {
+  try {
+    const { customerCode, id } = req.params;
+    
+    // Security check for customer users
+    if (req.user.role === 'customer' && customerCode !== req.user.customer_code) {
+      return res.status(403).json({
+        success: false,
+        message: 'Access denied'
+      });
+    }
+    
+    const order = await Order.findOne({
+      where: { 
+        id: id,
+        customer_code: customerCode
+      }
+    });
+    
+    if (!order) {
+      return res.status(404).json({
+        success: false,
+        message: 'Order not found'
+      });
+    }
+    
+    res.json({
+      success: true,
+      data: order
+    });
+    
+  } catch (error) {
+    console.error('Error fetching order details:', error);
     res.status(500).json({
+      success: false,
+      message: 'Failed to fetch order details',
+      error: error.message
+    });
+  }
+});
+
+s.status(500).json({
       success: false,
       message: 'Failed to fetch orders',
       error: error.message
