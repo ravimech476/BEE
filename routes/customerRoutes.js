@@ -27,7 +27,7 @@ router.get('/:customerCode/order-stats', authMiddleware, async (req, res) => {
          COUNT(DISTINCT id) AS TotalOrders,
         SUM(qty) AS TotalQuantity,
         SUM(net_amount) AS TotalValue
-      FROM [customerconnect].[dbo].[d2d_sales]
+      FROM [D2D].[dbo].[d2d_sales]
       WHERE customer_code = :customerCode`,
       {
         replacements: { customerCode: customerFilter },
@@ -38,8 +38,8 @@ router.get('/:customerCode/order-stats', authMiddleware, async (req, res) => {
     // Get dispatch count by matching d2d_sales.billing_doc_no with d2d_dispatch_entry.invoice_no
     const [dispatchStats] = await sequelize.query(
       `SELECT COUNT(DISTINCT s.billing_doc_no) as DispatchedCount
-      FROM [customerconnect].[dbo].[d2d_sales] s
-      INNER JOIN [customerconnect].[dbo].[d2d_dispatch_entry] d 
+      FROM [D2D].[dbo].[d2d_sales] s
+      INNER JOIN [D2D].[dbo].[d2d_dispatch_entry] d 
         ON s.billing_doc_no = d.invoice_no
       WHERE s.customer_code = :customerCode`,
       {

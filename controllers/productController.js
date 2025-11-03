@@ -427,7 +427,7 @@ const productController = {
               material_no,
               SUM(TRY_CAST(qty AS FLOAT)) AS ProductQuantity,
               SUM(TRY_CAST(net_amount AS FLOAT)) AS ProductTotalValue
-            FROM [customerconnect].[dbo].[d2d_sales]
+            FROM [D2D].[dbo].[d2d_sales]
             WHERE customer_code = :customer_code
             GROUP BY material_no
           )
