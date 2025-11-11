@@ -64,27 +64,66 @@ const newsController = {
   getNewsById: async (req, res, next) => {
     try {
       const { id } = req.params;
-      const whereClause = { id };
+      const sequelize = News.sequelize;
+      
+      console.log(`Fetching news with ID: ${id}`);
 
-      // For customers, only show active news
-      if (req.user.role === 'customer') {
-        whereClause.status = 'active';
-      }
-
-      const news = await News.findOne({ where: whereClause });
-
-      if (!news) {
-        return res.status(404).json({
+      // Validate ID
+      const newsId = parseInt(id);
+      if (isNaN(newsId)) {
+        return res.status(400).json({
           success: false,
-          message: 'News not found'
+          message: 'Invalid news ID'
         });
       }
+
+      // Use raw SQL query - only select columns that exist in the table
+      const query = `
+        SELECT 
+          [id],
+          [title],
+          [content],
+          [excerpt],
+          [image],
+          [category],
+          [display_order],
+          [status],
+          [published_date],
+          [created_date],
+          [modified_date],
+          [created_by]
+        FROM [customerconnect].[dbo].[news]
+        WHERE [id] = ${newsId}
+          AND [status] = 'active'
+      `;
+
+      const newsItems = await sequelize.query(query, {
+        type: sequelize.QueryTypes.SELECT
+      });
+
+      if (!newsItems || newsItems.length === 0) {
+        return res.status(404).json({
+          success: false,
+          message: 'News article not found or inactive'
+        });
+      }
+
+      // Get the news item
+      const news = newsItems[0];
+      
+      // Map image field to image_url for frontend compatibility
+      if (news.image && !news.image_url) {
+        news.image_url = news.image;
+      }
+
+      console.log(`Successfully fetched news: ${news.title}`);
 
       res.json({
         success: true,
         data: news
       });
     } catch (error) {
+      console.error('Error in getNewsById:', error);
       next(error);
     }
   },
