@@ -41,6 +41,7 @@ router.use(logPageAccess);
 // Routes accessible by both admin and customer
 router.get('/', newsController.getAllNews);
 router.get('/latest', newsController.getLatestNews);
+router.get('/dashboard-news', newsController.getLatestNewsRaw);
 router.get('/:id', newsController.getNewsById);
 
 // Admin only routes

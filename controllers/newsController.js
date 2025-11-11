@@ -208,6 +208,44 @@ const newsController = {
     } catch (error) {
       next(error);
     }
+  },
+
+  // Get all active news from [news] table using raw SQL (for dashboard)
+  getLatestNewsRaw: async (req, res, next) => {
+    try {
+      const sequelize = News.sequelize;
+
+      const query = `
+        SELECT 
+          [id],
+          [title],
+          [content],
+          [excerpt],
+          [image],
+          [category],
+          [display_order],
+          [status],
+          [published_date],
+          [created_date],
+          [modified_date],
+          [created_by]
+        FROM [customerconnect].[dbo].[news]
+        WHERE [status] = 'active'
+        ORDER BY [published_date] DESC, [display_order] ASC
+      `;
+
+      const newsItems = await sequelize.query(query, {
+        type: sequelize.QueryTypes.SELECT
+      });
+
+      res.json({
+        success: true,
+        data: newsItems
+      });
+    } catch (error) {
+      console.error('Error fetching news:', error);
+      next(error);
+    }
   }
 };
 
