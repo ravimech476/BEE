@@ -123,10 +123,15 @@ module.exports = (sequelize, DataTypes) => {
       allowNull: true,
       comment: 'JSON array of harvest season months'
     },
-    procurement_method: {
-      type: DataTypes.STRING(100),
+    material: {
+      type: DataTypes.STRING(200),
       allowNull: true,
-      comment: 'Procurement method (Contract Farming, Wild Collection, etc.)'
+      comment: 'Material information'
+    },
+    procurement_method: {
+      type: DataTypes.TEXT,
+      allowNull: true,
+      comment: 'Procurement methods as JSON array'
     },
     main_components: {
       type: DataTypes.TEXT,

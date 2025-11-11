@@ -33,9 +33,14 @@ const productValidation = [
     .isIn(['active', 'inactive'])
     .withMessage('Status must be either active or inactive'),
   body('priority')
-    .optional()
-    .isInt({ min: 0 })
-    .withMessage('Priority must be a non-negative integer')
+    .optional({ nullable: true, checkFalsy: true })
+    .custom((value) => {
+      if (value === '' || value === null || value === undefined) return true;
+      if (!Number.isInteger(Number(value)) || Number(value) < 0) {
+        throw new Error('Priority must be a non-negative integer');
+      }
+      return true;
+    })
 ];
 
 const bulkUpdateValidation = [

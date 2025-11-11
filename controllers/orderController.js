@@ -73,7 +73,7 @@ const orderController = {
           COUNT(DISTINCT id) AS TotalOrders,
           SUM(qty) AS TotalQuantity,
           SUM(net_amount) AS TotalValue
-        FROM [D2D].[dbo].[d2d_sales]`,
+        FROM [customerconnect].[dbo].[d2d_sales]`,
         {
           type: sequelize.QueryTypes.SELECT
         }
@@ -82,8 +82,8 @@ const orderController = {
       // Get dispatch count by matching d2d_sales.billing_doc_no with d2d_dispatch_entry.invoice_no
       const [dispatchStats] = await sequelize.query(
         `SELECT COUNT(DISTINCT s.billing_doc_no) as DispatchedCount
-        FROM [D2D].[dbo].[d2d_sales] s
-        INNER JOIN [D2D].[dbo].[d2d_dispatch_entry] d 
+        FROM [customerconnect].[dbo].[d2d_sales] s
+        INNER JOIN [customerconnect].[dbo].[d2d_dispatch_entry] d 
           ON s.billing_doc_no = d.invoice_no`,
         {
           type: sequelize.QueryTypes.SELECT
@@ -100,7 +100,7 @@ const orderController = {
         `SELECT
           COUNT(DISTINCT id) AS ThisMonthOrders,
           SUM(net_amount) AS ThisMonthAmount
-        FROM [D2D].[dbo].[d2d_sales]
+        FROM [customerconnect].[dbo].[d2d_sales]
         WHERE bill_date >= :currentMonth`,
         {
           replacements: { currentMonth: currentMonthStr },

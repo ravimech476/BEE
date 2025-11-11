@@ -75,20 +75,24 @@ const productController = {
         search,
         status,
         product_group,
+        date,
         sortBy = 'priority',
         sortOrder = 'ASC'
       } = req.query;
 
       const offset = (page - 1) * limit;
       const whereClause = {};
+      const andConditions = [];
 
       // Add search condition
       if (search) {
-        whereClause[Op.or] = [
-          { product_name: { [Op.like]: `%${search}%` } },
-          { product_number: { [Op.like]: `%${search}%` } },
-          { product_short_description: { [Op.like]: `%${search}%` } }
-        ];
+        andConditions.push({
+          [Op.or]: [
+            { product_name: { [Op.like]: `%${search}%` } },
+            { product_number: { [Op.like]: `%${search}%` } },
+            { product_short_description: { [Op.like]: `%${search}%` } }
+          ]
+        });
       }
 
       // Add status filter
@@ -99,6 +103,35 @@ const productController = {
       // Add product group filter
       if (product_group) {
         whereClause.product_group = product_group;
+      }
+
+      // Add date filter (filter by created_date or modified_date)
+      if (date) {
+        const filterDate = new Date(date);
+        const nextDay = new Date(filterDate);
+        nextDay.setDate(nextDay.getDate() + 1);
+        
+        andConditions.push({
+          [Op.or]: [
+            {
+              created_date: {
+                [Op.gte]: filterDate,
+                [Op.lt]: nextDay
+              }
+            },
+            {
+              modified_date: {
+                [Op.gte]: filterDate,
+                [Op.lt]: nextDay
+              }
+            }
+          ]
+        });
+      }
+
+      // Combine AND conditions if they exist
+      if (andConditions.length > 0) {
+        whereClause[Op.and] = andConditions;
       }
 
       // For customers, only show active products
@@ -179,6 +212,7 @@ const productController = {
         peak_season_months,
         harvest_season_enabled,
         harvest_season_months,
+        material,
         procurement_method,
         main_components,
         sensory_notes,
@@ -228,6 +262,7 @@ const productController = {
         peak_season_months,
         harvest_season_enabled: harvest_season_enabled === 'true' || harvest_season_enabled === true,
         harvest_season_months,
+        material,
         procurement_method,
         main_components,
         sensory_notes,
@@ -427,7 +462,7 @@ const productController = {
               material_no,
               SUM(TRY_CAST(qty AS FLOAT)) AS ProductQuantity,
               SUM(TRY_CAST(net_amount AS FLOAT)) AS ProductTotalValue
-            FROM [D2D].[dbo].[d2d_sales]
+            FROM [customerconnect].[dbo].[d2d_sales]
             WHERE customer_code = :customer_code
             GROUP BY material_no
           )
