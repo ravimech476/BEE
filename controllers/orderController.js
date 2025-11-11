@@ -2,7 +2,7 @@ const { Order, Product, User } = require('../models');
 const { Op } = require('sequelize');
 
 const orderController = {
-  // Get all orders with pagination, search, and filters
+  // Get all orders with pagination, search, and filters (from d2d_sales table)
   async getOrders(req, res) {
     try {
       const { 
@@ -17,48 +17,89 @@ const orderController = {
       const offset = (page - 1) * limit;
       const sequelize = Order.sequelize;
       
-      // Build where clause
-      const whereClause = {};
+      // Build WHERE conditions for search and filters
+      let whereConditions = [];
       
       if (search) {
-        whereClause[Op.or] = [
-          { invoice_number: { [Op.like]: `%${search}%` } },
-          { customer_name: { [Op.like]: `%${search}%` } },
-          { product_name: { [Op.like]: `%${search}%` } }
-        ];
+        whereConditions.push(`(
+          customer_code LIKE '%${search}%' OR 
+          billing_doc_no LIKE '%${search}%' OR 
+          description LIKE '%${search}%' OR
+          customer_po_number LIKE '%${search}%'
+        )`);
       }
       
       if (status) {
-        whereClause.status = status;
+        if (status === 'Over Due') {
+          whereConditions.push(`due_date < CAST(GETDATE() AS DATE)`);
+        } else if (status === 'Due') {
+          whereConditions.push(`due_date = CAST(GETDATE() AS DATE)`);
+        } else if (status === 'No Due') {
+          whereConditions.push(`(due_date > CAST(GETDATE() AS DATE) OR due_date IS NULL)`);
+        }
       }
       
       if (startDate && endDate) {
-        // Use raw SQL condition to avoid date conversion issues
-        whereClause[Op.and] = sequelize.literal(
-          `invoice_date BETWEEN '${startDate}' AND '${endDate}'`
-        );
+        whereConditions.push(`bill_date BETWEEN '${startDate}' AND '${endDate}'`);
       }
+      
+      const whereClause = whereConditions.length > 0 
+        ? 'WHERE ' + whereConditions.join(' AND ') 
+        : '';
 
-      const { count, rows } = await Order.findAndCountAll({
-        where: whereClause,
-        limit: parseInt(limit),
-        offset: parseInt(offset),
-        order: [['invoice_date', 'DESC']]
-        // Removed product association to avoid join issues
+      // Get total count
+      const countQuery = `
+        SELECT COUNT(*) as total
+        FROM [customerconnect].[dbo].[d2d_sales]
+        ${whereClause}
+      `;
+      
+      const [countResult] = await sequelize.query(countQuery, {
+        type: sequelize.QueryTypes.SELECT
       });
+      
+      const totalItems = countResult.total;
+      const totalPages = Math.ceil(totalItems / limit);
 
-      const totalPages = Math.ceil(count / limit);
+      // Get paginated data
+      const dataQuery = `
+        SELECT 
+          id,
+          customer_code as CustomerCode,
+          customer_po_number,
+          billing_doc_no as Invoice,
+          description as Product,
+          qty as Quantity,
+          basis_rate_inr as Amount,
+          bill_date as BillDate,
+          due_date,
+          CASE 
+            WHEN due_date < CAST(GETDATE() AS DATE) THEN 'Over Due'
+            WHEN due_date = CAST(GETDATE() AS DATE) THEN 'Due'
+            WHEN due_date > CAST(GETDATE() AS DATE) THEN 'No Due'
+            ELSE 'No Due'
+          END AS Status
+        FROM [customerconnect].[dbo].[d2d_sales]
+        ${whereClause}
+        ORDER BY bill_date DESC
+        OFFSET ${offset} ROWS
+        FETCH NEXT ${limit} ROWS ONLY
+      `;
+
+      const rows = await sequelize.query(dataQuery, {
+        type: sequelize.QueryTypes.SELECT
+      });
 
       res.json({
         sales: rows,
         currentPage: parseInt(page),
         totalPages,
-        totalItems: count,
+        totalItems: totalItems,
         itemsPerPage: parseInt(limit)
       });
     } catch (error) {
       console.error('Error fetching orders:', error);
-      res.status(500).json({ error: 'Failed to fetch orders' });
+      res.status(500).json({ error: 'Failed to fetch orders', details: error.message });
     }
   },
 
