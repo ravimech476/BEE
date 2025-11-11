@@ -6,6 +6,9 @@ const { authMiddleware } = require('../middleware/auth');
 // Get order statistics (protected)
 router.get('/stats', authMiddleware, orderController.getOrderStats);
 
+// Get monthly sales chart data (protected)
+router.get('/monthly-sales-chart', authMiddleware, orderController.getMonthlySalesChart);
+
 // Get all orders with filters (protected)
 router.get('/', authMiddleware, orderController.getOrders);
 

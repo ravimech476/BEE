@@ -1,68 +1,68 @@
-const { Product } = require('../models');
-const { Op } = require('sequelize');
-const { deleteOldImage } = require('../middleware/imageUpload');
-const path = require('path');
+const { Product } = require("../models");
+const { Op } = require("sequelize");
+const { deleteOldImage } = require("../middleware/imageUpload");
+const path = require("path");
 
 // Helper function to format image URLs
 const formatImageUrls = (product, req) => {
-  const baseUrl = `${req.protocol}://${req.get('host')}`;
-  
+  const baseUrl = `${req.protocol}://${req.get("host")}`;
+
   // Create a copy of the product data
   const productData = product.toJSON ? product.toJSON() : { ...product };
-  
+
   // Format image URLs
   if (productData.product_image1) {
     // If it's already a full URL, keep it as is
-    if (productData.product_image1.startsWith('http')) {
+    if (productData.product_image1.startsWith("http")) {
       productData.image1_url = productData.product_image1;
     } else {
       // If it's a relative path, create full URL
       // Remove leading 'uploads/' if present to avoid duplication
-      const cleanPath = productData.product_image1.startsWith('uploads/') 
-        ? productData.product_image1.substring(8) 
+      const cleanPath = productData.product_image1.startsWith("uploads/")
+        ? productData.product_image1.substring(8)
         : productData.product_image1;
       productData.image1_url = `${baseUrl}/uploads/${cleanPath}`;
     }
   } else {
     productData.image1_url = null;
   }
-  
+
   if (productData.product_image2) {
     // If it's already a full URL, keep it as is
-    if (productData.product_image2.startsWith('http')) {
+    if (productData.product_image2.startsWith("http")) {
       productData.image2_url = productData.product_image2;
     } else {
       // If it's a relative path, create full URL
       // Remove leading 'uploads/' if present to avoid duplication
-      const cleanPath = productData.product_image2.startsWith('uploads/') 
-        ? productData.product_image2.substring(8) 
+      const cleanPath = productData.product_image2.startsWith("uploads/")
+        ? productData.product_image2.substring(8)
         : productData.product_image2;
       productData.image2_url = `${baseUrl}/uploads/${cleanPath}`;
     }
   } else {
     productData.image2_url = null;
   }
-  
+
   // Format harvest region image URL
   if (productData.harvest_region_image) {
-    if (productData.harvest_region_image.startsWith('http')) {
+    if (productData.harvest_region_image.startsWith("http")) {
       productData.harvest_region_image_url = productData.harvest_region_image;
     } else {
-      const cleanPath = productData.harvest_region_image.startsWith('uploads/') 
-        ? productData.harvest_region_image.substring(8) 
+      const cleanPath = productData.harvest_region_image.startsWith("uploads/")
+        ? productData.harvest_region_image.substring(8)
         : productData.harvest_region_image;
       productData.harvest_region_image_url = `${baseUrl}/uploads/${cleanPath}`;
     }
   } else {
     productData.harvest_region_image_url = null;
   }
-  
+
   return productData;
 };
 
 // Helper function to format multiple products
 const formatProductsWithImages = (products, req) => {
-  return products.map(product => formatImageUrls(product, req));
+  return products.map((product) => formatImageUrls(product, req));
 };
 
 const productController = {
@@ -76,8 +76,8 @@ const productController = {
         status,
         product_group,
         date,
-        sortBy = 'priority',
-        sortOrder = 'ASC'
+        sortBy = "priority",
+        sortOrder = "ASC",
       } = req.query;
 
       const offset = (page - 1) * limit;
@@ -90,8 +90,8 @@ const productController = {
           [Op.or]: [
             { product_name: { [Op.like]: `%${search}%` } },
             { product_number: { [Op.like]: `%${search}%` } },
-            { product_short_description: { [Op.like]: `%${search}%` } }
-          ]
+            { product_short_description: { [Op.like]: `%${search}%` } },
+          ],
         });
       }
 
@@ -110,22 +110,22 @@ const productController = {
         const filterDate = new Date(date);
         const nextDay = new Date(filterDate);
         nextDay.setDate(nextDay.getDate() + 1);
-        
+
         andConditions.push({
           [Op.or]: [
             {
               created_date: {
                 [Op.gte]: filterDate,
-                [Op.lt]: nextDay
-              }
+                [Op.lt]: nextDay,
+              },
             },
             {
               modified_date: {
                 [Op.gte]: filterDate,
-                [Op.lt]: nextDay
-              }
-            }
-          ]
+                [Op.lt]: nextDay,
+              },
+            },
+          ],
         });
       }
 
@@ -135,15 +135,15 @@ const productController = {
       }
 
       // For customers, only show active products
-      if (req.user.role === 'customer') {
-        whereClause.status = 'active';
+      if (req.user.role === "customer") {
+        whereClause.status = "active";
       }
 
       const { count, rows } = await Product.findAndCountAll({
         where: whereClause,
         limit: parseInt(limit),
         offset: parseInt(offset),
-        order: [[sortBy, sortOrder.toUpperCase()]]
+        order: [[sortBy, sortOrder.toUpperCase()]],
       });
 
       // Format products with image URLs
@@ -157,9 +157,9 @@ const productController = {
             total: count,
             totalPages: Math.ceil(count / limit),
             currentPage: parseInt(page),
-            limit: parseInt(limit)
-          }
-        }
+            limit: parseInt(limit),
+          },
+        },
       });
     } catch (error) {
       next(error);
@@ -173,8 +173,8 @@ const productController = {
       const whereClause = { id };
 
       // For customers, only show active products
-      if (req.user.role === 'customer') {
-        whereClause.status = 'active';
+      if (req.user.role === "customer") {
+        whereClause.status = "active";
       }
 
       const product = await Product.findOne({ where: whereClause });
@@ -182,7 +182,7 @@ const productController = {
       if (!product) {
         return res.status(404).json({
           success: false,
-          message: 'Product not found'
+          message: "Product not found",
         });
       }
 
@@ -191,7 +191,7 @@ const productController = {
 
       res.json({
         success: true,
-        data: productWithImages
+        data: productWithImages,
       });
     } catch (error) {
       next(error);
@@ -224,12 +224,13 @@ const productController = {
         uom,
         product_short_description,
         product_group,
-        status = 'active',
-        priority = 0
+        status = "active",
+        priority = 0,
       } = req.body;
 
       // Use common_name as product_name if product_name is not provided
-      const product_name = req.body.product_name || common_name || product_number;
+      const product_name =
+        req.body.product_name || common_name || product_number;
 
       // Handle uploaded images
       let product_image1 = req.body.product_image1 || null;
@@ -244,7 +245,10 @@ const productController = {
         if (req.files.image2 && req.files.image2[0]) {
           product_image2 = `products/images/${req.files.image2[0].filename}`;
         }
-        if (req.files.harvest_region_image && req.files.harvest_region_image[0]) {
+        if (
+          req.files.harvest_region_image &&
+          req.files.harvest_region_image[0]
+        ) {
           harvest_region_image = `products/harvest-regions/${req.files.harvest_region_image[0].filename}`;
         }
       }
@@ -258,9 +262,11 @@ const productController = {
         source_country,
         harvest_region_new,
         harvest_region_image,
-        peak_season_enabled: peak_season_enabled === 'true' || peak_season_enabled === true,
+        peak_season_enabled:
+          peak_season_enabled === "true" || peak_season_enabled === true,
         peak_season_months,
-        harvest_season_enabled: harvest_season_enabled === 'true' || harvest_season_enabled === true,
+        harvest_season_enabled:
+          harvest_season_enabled === "true" || harvest_season_enabled === true,
         harvest_season_months,
         material,
         procurement_method,
@@ -279,7 +285,7 @@ const productController = {
         status,
         priority,
         created_date: new Date(),
-        modified_date: new Date()
+        modified_date: new Date(),
       });
 
       // Format product with image URLs
@@ -287,8 +293,8 @@ const productController = {
 
       res.status(201).json({
         success: true,
-        message: 'Product created successfully',
-        data: productWithImages
+        message: "Product created successfully",
+        data: productWithImages,
       });
     } catch (error) {
       next(error);
@@ -299,32 +305,34 @@ const productController = {
   updateProduct: async (req, res, next) => {
     try {
       const { id } = req.params;
-      
+
       const product = await Product.findByPk(id);
 
       if (!product) {
         return res.status(404).json({
           success: false,
-          message: 'Product not found'
+          message: "Product not found",
         });
       }
 
       // Prepare update data
       const updateData = { ...req.body, modified_date: new Date() };
-      
+
       // Use common_name as product_name if product_name is not provided
       if (!updateData.product_name && updateData.common_name) {
         updateData.product_name = updateData.common_name;
       }
-      
+
       // Handle boolean conversions for season fields
-      if (typeof updateData.peak_season_enabled === 'string') {
-        updateData.peak_season_enabled = updateData.peak_season_enabled === 'true';
+      if (typeof updateData.peak_season_enabled === "string") {
+        updateData.peak_season_enabled =
+          updateData.peak_season_enabled === "true";
       }
-      if (typeof updateData.harvest_season_enabled === 'string') {
-        updateData.harvest_season_enabled = updateData.harvest_season_enabled === 'true';
+      if (typeof updateData.harvest_season_enabled === "string") {
+        updateData.harvest_season_enabled =
+          updateData.harvest_season_enabled === "true";
       }
-      
+
       // Handle image uploads
       if (req.files) {
         if (req.files.image1 && req.files.image1[0]) {
@@ -334,7 +342,7 @@ const productController = {
           }
           updateData.product_image1 = `products/images/${req.files.image1[0].filename}`;
         }
-        
+
         if (req.files.image2 && req.files.image2[0]) {
           // Delete old image2 if it exists
           if (product.product_image2) {
@@ -342,8 +350,11 @@ const productController = {
           }
           updateData.product_image2 = `products/images/${req.files.image2[0].filename}`;
         }
-        
-        if (req.files.harvest_region_image && req.files.harvest_region_image[0]) {
+
+        if (
+          req.files.harvest_region_image &&
+          req.files.harvest_region_image[0]
+        ) {
           // Delete old harvest region image if it exists
           if (product.harvest_region_image) {
             deleteOldImage(product.harvest_region_image);
@@ -353,21 +364,21 @@ const productController = {
       }
 
       // Handle image removal flags
-      if (req.body.remove_image1 === 'true') {
+      if (req.body.remove_image1 === "true") {
         if (product.product_image1) {
           deleteOldImage(product.product_image1);
         }
         updateData.product_image1 = null;
       }
-      
-      if (req.body.remove_image2 === 'true') {
+
+      if (req.body.remove_image2 === "true") {
         if (product.product_image2) {
           deleteOldImage(product.product_image2);
         }
         updateData.product_image2 = null;
       }
-      
-      if (req.body.remove_harvest_region_image === 'true') {
+
+      if (req.body.remove_harvest_region_image === "true") {
         if (product.harvest_region_image) {
           deleteOldImage(product.harvest_region_image);
         }
@@ -383,8 +394,8 @@ const productController = {
 
       res.json({
         success: true,
-        message: 'Product updated successfully',
-        data: productWithImages
+        message: "Product updated successfully",
+        data: productWithImages,
       });
     } catch (error) {
       next(error);
@@ -401,7 +412,7 @@ const productController = {
       if (!product) {
         return res.status(404).json({
           success: false,
-          message: 'Product not found'
+          message: "Product not found",
         });
       }
 
@@ -409,7 +420,7 @@ const productController = {
 
       res.json({
         success: true,
-        message: 'Product deleted successfully'
+        message: "Product deleted successfully",
       });
     } catch (error) {
       next(error);
@@ -420,19 +431,19 @@ const productController = {
   getProductGroups: async (req, res, next) => {
     try {
       const groups = await Product.findAll({
-        attributes: ['product_group'],
+        attributes: ["product_group"],
         where: {
           product_group: { [Op.ne]: null },
-          ...(req.user.role === 'customer' && { status: 'active' })
+          ...(req.user.role === "customer" && { status: "active" }),
         },
-        group: ['product_group']
+        group: ["product_group"],
       });
 
-      const productGroups = groups.map(group => group.product_group);
+      const productGroups = groups.map((group) => group.product_group);
 
       res.json({
         success: true,
-        data: productGroups
+        data: productGroups,
       });
     } catch (error) {
       next(error);
@@ -440,8 +451,8 @@ const productController = {
   },
 
   // Get top products by sales amount with priority fallback
- // Get top products by sales amount with priority fallback
-// Get top products by sales amount with priority fallback
+  // Get top products by sales amount with priority fallback
+  // Get top products by sales amount with priority fallback
   // REPLACE THE getTopProductsBySales FUNCTION WITH THIS CODE:
 
   // Get top products by sales amount with priority fallback
@@ -451,36 +462,29 @@ const productController = {
       const sequelize = Product.sequelize;
 
       const limitValue = parseInt(limit);
-      
+
       let query, replacements;
 
       if (customer_code) {
         // Query with customer filter using d2d_sales
-        query = `
-          WITH ProductSummary AS (
-            SELECT
-              material_no,
-              SUM(TRY_CAST(qty AS FLOAT)) AS ProductQuantity,
-              SUM(TRY_CAST(net_amount AS FLOAT)) AS ProductTotalValue
-            FROM [customerconnect].[dbo].[d2d_sales]
-            WHERE customer_code = :customer_code
-            GROUP BY material_no
-          )
-          SELECT TOP (:limit)
-            p.*,
-            ISNULL(ps.ProductQuantity, 0) as ProductQuantity,
-            ISNULL(ps.ProductTotalValue, 0) as ProductTotalValue,
-            CASE WHEN ps.material_no IS NOT NULL THEN 1 ELSE 2 END as match_priority
-          FROM tbl_products p
-          LEFT JOIN ProductSummary ps ON p.product_number = ps.material_no
-          WHERE p.status = 'active'
-          ORDER BY 
-            CASE WHEN ps.material_no IS NOT NULL THEN 1 ELSE 2 END ASC,
-            CASE 
-              WHEN ps.material_no IS NOT NULL THEN ISNULL(ps.ProductTotalValue, 0)
-              ELSE ISNULL(p.priority, 0)
-            END DESC
-        `;
+        query = `WITH ProductSummary AS (
+    SELECT
+        material_no,
+        SUM(TRY_CAST(qty AS FLOAT)) AS ProductQuantity
+    FROM [customerconnect].[dbo].[d2d_sales]
+    WHERE customer_code = :customer_code
+    GROUP BY material_no
+)
+SELECT TOP 3
+    p.*,
+    ISNULL(ps.ProductQuantity, 0) AS ProductQuantity
+FROM tbl_products p
+LEFT JOIN ProductSummary ps 
+    ON p.product_number = ps.material_no
+WHERE p.status = 'active'
+ORDER BY 
+    ISNULL(ps.ProductQuantity, 0) DESC;
+`;
         replacements = { limit: limitValue, customer_code };
       } else {
         // Query without customer filter - just use priority
@@ -499,54 +503,62 @@ const productController = {
 
       const products = await sequelize.query(query, {
         replacements,
-        type: sequelize.QueryTypes.SELECT
+        type: sequelize.QueryTypes.SELECT,
       });
 
       // Format products with image URLs
-      const productsWithImages = products.map(product => formatImageUrls({
-        toJSON: () => product
-      }, req));
+      const productsWithImages = products.map((product) =>
+        formatImageUrls(
+          {
+            toJSON: () => product,
+          },
+          req
+        )
+      );
 
       res.json({
         success: true,
         data: {
           products: productsWithImages,
-          total: products.length
-        }
+          total: products.length,
+        },
       });
     } catch (error) {
-      console.error('Error fetching top products by sales:', error);
-      console.error('Error details:', error.message);
+      console.error("Error fetching top products by sales:", error);
+      console.error("Error details:", error.message);
       next(error);
     }
   },
 
-
-// KEY CHANGES MADE:
-// 1. Used TRY_CAST instead of CAST to handle data type issues gracefully
-// 2. Simplified the query - removed complex CTEs and UNION
-// 3. Used LEFT JOIN instead of INNER JOIN + separate priority query
-// 4. Used p.* to select all product columns (avoids listing each column)
-// 5. Added better error logging with error.message
-// 6. Separate query paths for with/without customer_code
-// 7. Used :parameter syntax consistently (Sequelize handles conversion)
+  // KEY CHANGES MADE:
+  // 1. Used TRY_CAST instead of CAST to handle data type issues gracefully
+  // 2. Simplified the query - removed complex CTEs and UNION
+  // 3. Used LEFT JOIN instead of INNER JOIN + separate priority query
+  // 4. Used p.* to select all product columns (avoids listing each column)
+  // 5. Added better error logging with error.message
+  // 6. Separate query paths for with/without customer_code
+  // 7. Used :parameter syntax consistently (Sequelize handles conversion)
 
   // Bulk update product status (Admin only)
   bulkUpdateStatus: async (req, res, next) => {
     try {
       const { productIds, status } = req.body;
 
-      if (!productIds || !Array.isArray(productIds) || productIds.length === 0) {
+      if (
+        !productIds ||
+        !Array.isArray(productIds) ||
+        productIds.length === 0
+      ) {
         return res.status(400).json({
           success: false,
-          message: 'Product IDs are required'
+          message: "Product IDs are required",
         });
       }
 
-      if (!['active', 'inactive'].includes(status)) {
+      if (!["active", "inactive"].includes(status)) {
         return res.status(400).json({
           success: false,
-          message: 'Invalid status value'
+          message: "Invalid status value",
         });
       }
 
@@ -557,12 +569,12 @@ const productController = {
 
       res.json({
         success: true,
-        message: `${productIds.length} products updated successfully`
+        message: `${productIds.length} products updated successfully`,
       });
     } catch (error) {
       next(error);
     }
-  }
+  },
 };
 
 module.exports = productController;

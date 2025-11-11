@@ -276,6 +276,71 @@ const orderController = {
       console.error('Error fetching customer orders:', error);
       res.status(500).json({ error: 'Failed to fetch customer orders' });
     }
+  },
+
+  // Get monthly sales chart data
+  async getMonthlySalesChart(req, res) {
+    try {
+      const { period = 'last6months', customerCode } = req.query;
+      const sequelize = Order.sequelize;
+
+      // Determine how many months to fetch
+      let monthsBack = 6;
+      if (period === 'thisMonth') monthsBack = 1;
+      else if (period === 'last3months') monthsBack = 3;
+      else if (period === 'last6months') monthsBack = 6;
+      else if (period === 'last12months') monthsBack = 12;
+
+      // Build query with optional customer filter
+      const customerFilter = customerCode ? `AND customer_code = '${customerCode}'` : '';
+
+      const query = `
+        WITH MonthRange AS (
+          SELECT TOP (${monthsBack})
+            DATEADD(MONTH, -ROW_NUMBER() OVER (ORDER BY (SELECT NULL)) + 1, 
+                    DATEFROMPARTS(YEAR(GETDATE()), MONTH(GETDATE()), 1)) AS MonthStart
+          FROM sys.all_objects
+        ),
+        MonthlySales AS (
+          SELECT 
+            YEAR(CAST(bill_date AS DATE)) AS Year,
+            MONTH(CAST(bill_date AS DATE)) AS Month,
+            SUM(CAST(ISNULL(net_amount, 0) AS FLOAT)) AS TotalValue,
+            SUM(CAST(ISNULL(qty, 0) AS FLOAT)) AS TotalQuantity
+          FROM [customerconnect].[dbo].[d2d_sales]
+          WHERE bill_date IS NOT NULL
+            AND CAST(bill_date AS DATE) >= DATEADD(MONTH, -${monthsBack}, DATEFROMPARTS(YEAR(GETDATE()), MONTH(GETDATE()), 1))
+            ${customerFilter}
+          GROUP BY YEAR(CAST(bill_date AS DATE)), MONTH(CAST(bill_date AS DATE))
+        )
+        SELECT 
+          FORMAT(mr.MonthStart, 'MMM yyyy') AS month,
+          CAST(ISNULL(ms.TotalValue, 0) AS FLOAT) AS value,
+          CAST(ISNULL(ms.TotalQuantity, 0) AS FLOAT) AS quantity
+        FROM MonthRange mr
+        LEFT JOIN MonthlySales ms 
+          ON YEAR(mr.MonthStart) = ms.Year AND MONTH(mr.MonthStart) = ms.Month
+        ORDER BY mr.MonthStart ASC
+      `;
+
+      const chartData = await sequelize.query(query, {
+        type: sequelize.QueryTypes.SELECT
+      });
+
+      res.json({
+        success: true,
+        data: chartData
+      });
+    } catch (error) {
+      console.error('Error fetching monthly sales chart:', error);
+      console.error('Error message:', error.message);
+      console.error('SQL Query:', error.sql || 'N/A');
+      res.status(500).json({ 
+        success: false,
+        error: 'Failed to fetch sales chart data',
+        details: error.message
+      });
+    }
   }
 };
 
