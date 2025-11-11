@@ -1,8 +1,8 @@
-const { InvoiceToDelivery } = require('../models');
+const { InvoiceToDelivery, sequelize } = require('../models');
 const { Op } = require('sequelize');
 
 const invoiceToDeliveryController = {
-  // Get all invoice to delivery records with pagination and search
+  // Get all invoice to delivery records with pagination and search (JOIN query)
   async getInvoiceToDeliveries(req, res) {
     try {
       const { 
@@ -14,40 +14,87 @@ const invoiceToDeliveryController = {
 
       const offset = (page - 1) * limit;
       
-      // Build where clause
-      const whereClause = {};
+      // Build WHERE conditions for search and filters
+      let whereConditions = [];
       
       if (search) {
-        whereClause[Op.or] = [
-          { invoice_number: { [Op.like]: `%${search}%` } },
-          { lr_number: { [Op.like]: `%${search}%` } },
-          { delivery_partner: { [Op.like]: `%${search}%` } }
-        ];
+        whereConditions.push(`(
+          b.customer_code LIKE '%${search}%' OR 
+          a.invoice_no LIKE '%${search}%' OR 
+          a.waybill_no LIKE '%${search}%' OR
+          a.trackingstatus LIKE '%${search}%'
+        )`);
       }
       
       if (status) {
-        whereClause.status = status;
+        whereConditions.push(`a.trackingstatus = '${status}'`);
       }
+      
+      const whereClause = whereConditions.length > 0 
+        ? 'WHERE ' + whereConditions.join(' AND ') 
+        : '';
 
-      const { count, rows } = await InvoiceToDelivery.findAndCountAll({
-        where: whereClause,
-        limit: parseInt(limit),
-        offset: parseInt(offset),
-        order: [['sl_no', 'DESC']]
+      // Get total count
+      const countQuery = `
+        SELECT COUNT(*) as total
+        FROM (
+          SELECT DISTINCT  
+            b.customer_code,
+            a.invoice_no,
+            b.bill_date,
+            a.waybill_no,
+            a.trackingstatus
+          FROM [customerconnect].[dbo].[d2d_dispatch_entry] a 
+          INNER JOIN [customerconnect].[dbo].[d2d_sales] b
+            ON a.invoice_no = b.billing_doc_no
+          ${whereClause}
+          GROUP BY b.customer_code, a.invoice_no, b.bill_date, a.waybill_no, a.trackingstatus
+        ) as CountTable
+      `;
+      
+      const [countResult] = await sequelize.query(countQuery, {
+        type: sequelize.QueryTypes.SELECT
       });
+      
+      const totalItems = countResult.total;
+      const totalPages = Math.ceil(totalItems / limit);
 
-      const totalPages = Math.ceil(count / limit);
+      // Get paginated data
+      const dataQuery = `
+        SELECT DISTINCT  
+          b.customer_code,
+          a.invoice_no,
+          b.bill_date as InvoiceDate,
+          SUM(b.basis_rate_inr) as Value,
+          a.waybill_no as LRNumber,
+          a.trackingstatus as Status
+        FROM [customerconnect].[dbo].[d2d_dispatch_entry] a 
+        INNER JOIN [customerconnect].[dbo].[d2d_sales] b
+          ON a.invoice_no = b.billing_doc_no
+        ${whereClause}
+        GROUP BY b.customer_code, a.invoice_no, b.bill_date, a.waybill_no, a.trackingstatus
+        ORDER BY b.bill_date DESC
+        OFFSET ${offset} ROWS
+        FETCH NEXT ${limit} ROWS ONLY
+      `;
+
+      const rows = await sequelize.query(dataQuery, {
+        type: sequelize.QueryTypes.SELECT
+      });
 
       res.json({
         invoices: rows,
         currentPage: parseInt(page),
         totalPages,
-        totalItems: count,
+        totalItems: totalItems,
         itemsPerPage: parseInt(limit)
       });
     } catch (error) {
       console.error('Error fetching invoice to deliveries:', error);
-      res.status(500).json({ error: 'Failed to fetch invoice to deliveries' });
+      res.status(500).json({ 
+        error: 'Failed to fetch invoice to deliveries',
+        details: error.message 
+      });
     }
   },
 

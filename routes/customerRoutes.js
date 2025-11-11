@@ -70,63 +70,113 @@ router.get('/:customerCode/order-stats', authMiddleware, async (req, res) => {
   }
 });
 
-// Get customer-specific orders
+// Get customer-specific orders (from d2d_sales table)
 router.get('/:customerCode/orders', authMiddleware, async (req, res) => {
   try {
     const { customerCode } = req.params;
-    const { page = 1, limit = 10, search, status, sort = 'invoice_date', order = 'desc' } = req.query;
+    const { page = 1, limit = 10, search, status } = req.query;
     
-    // Add customer filter based on user type
-    let whereCondition = {};
-    if (req.user.role === 'customer') {
-      whereCondition.customer_code = req.user.customer_code;
-      if (customerCode !== req.user.customer_code) {
-        return res.status(403).json({
-          success: false,
-          message: 'Access denied'
-        });
-      }
-    } else {
-      whereCondition.customer_code = customerCode;
-    }
-
-    if (search) {
-      whereCondition[Op.or] = [
-        { invoice_number: { [Op.like]: `%${search}%` } },
-        { product_name: { [Op.like]: `%${search}%` } },
-        { customer_name: { [Op.like]: `%${search}%` } }
-      ];
-    }
-
-    if (status && status !== 'all') {
-      whereCondition.status = status;
+    // Security check for customer users
+    if (req.user.role === 'customer' && customerCode !== req.user.customer_code) {
+      return res.status(403).json({
+        success: false,
+        message: 'Access denied'
+      });
     }
 
     const offset = (parseInt(page) - 1) * parseInt(limit);
+    
+    // Build WHERE conditions
+    let whereConditions = [`customer_code = '${customerCode}'`];
+    
+    if (search) {
+      whereConditions.push(`(
+        customer_code LIKE '%${search}%' OR 
+        customer_po_number LIKE '%${search}%' OR
+        billing_doc_no LIKE '%${search}%' OR 
+        description LIKE '%${search}%' OR
+        CAST(qty AS VARCHAR) LIKE '%${search}%' OR
+        CAST(basis_rate_inr AS VARCHAR) LIKE '%${search}%' OR
+        CONVERT(VARCHAR, bill_date, 23) LIKE '%${search}%' OR
+        CONVERT(VARCHAR, due_date, 23) LIKE '%${search}%'
+      )`);
+    }
+    
+    if (status) {
+      if (status === 'Over Due') {
+        whereConditions.push(`due_date < CAST(GETDATE() AS DATE)`);
+      } else if (status === 'Due') {
+        whereConditions.push(`due_date = CAST(GETDATE() AS DATE)`);
+      } else if (status === 'No Due') {
+        whereConditions.push(`(due_date > CAST(GETDATE() AS DATE) OR due_date IS NULL)`);
+      }
+    }
+    
+    const whereClause = 'WHERE ' + whereConditions.join(' AND ');
 
-    const { count, rows: orders } = await Order.findAndCountAll({
-      where: whereCondition,
-      limit: parseInt(limit),
-      offset: offset,
-      order: [[sort, order.toUpperCase()]],
-      attributes: [
-        'id', 'invoice_number', 'customer_name', 'product_name', 
-        'quantity', 'amount', 'status', 'invoice_date', 'delivery_date'
-      ]
+    // Get total count
+    const countQuery = `
+      SELECT COUNT(*) as total
+      FROM [customerconnect].[dbo].[d2d_sales]
+      ${whereClause}
+    `;
+    
+    const [countResult] = await sequelize.query(countQuery, {
+      type: sequelize.QueryTypes.SELECT
+    });
+    
+    const totalItems = countResult.total;
+    const totalPages = Math.ceil(totalItems / parseInt(limit));
+
+    // Get paginated data
+    const dataQuery = `
+      SELECT 
+        id,
+        customer_code as CustomerCode,
+        customer_po_number,
+        billing_doc_no as Invoice,
+        description as Product,
+        qty as Quantity,
+        basis_rate_inr as Amount,
+        bill_date as BillDate,
+        due_date,
+        CASE 
+          WHEN due_date < CAST(GETDATE() AS DATE) THEN 'Over Due'
+          WHEN due_date = CAST(GETDATE() AS DATE) THEN 'Due'
+          WHEN due_date > CAST(GETDATE() AS DATE) THEN 'No Due'
+          ELSE 'No Due'
+        END AS Status
+      FROM [customerconnect].[dbo].[d2d_sales]
+      ${whereClause}
+      ORDER BY bill_date DESC
+      OFFSET ${offset} ROWS
+      FETCH NEXT ${parseInt(limit)} ROWS ONLY
+    `;
+
+    const orders = await sequelize.query(dataQuery, {
+      type: sequelize.QueryTypes.SELECT
     });
 
     res.json({
       success: true,
       data: {
         orders,
-        total: count,
-        totalPages: Math.ceil(count / parseInt(limit)),
+        total: totalItems,
+        totalPages: totalPages,
         currentPage: parseInt(page)
       }
     });
   } catch (error) {
     console.error('Error fetching customer orders:', error);
-    re// Get specific order details for customer
+    res.status(500).json({
+      success: false,
+      message: 'Failed to fetch orders',
+      error: error.message
+    });
+  }
+});
+
+// Get specific order details for customer
 router.get('/:customerCode/orders/:id', authMiddleware, async (req, res) => {
   try {
     const { customerCode, id } = req.params;
@@ -163,14 +213,6 @@ router.get('/:customerCode/orders/:id', authMiddleware, async (req, res) => {
     res.status(500).json({
       success: false,
       message: 'Failed to fetch order details',
-      error: error.message
-    });
-  }
-});
-
-s.status(500).json({
-      success: false,
-      message: 'Failed to fetch orders',
       error: error.message
     });
   }
@@ -420,55 +462,94 @@ router.get('/:customerCode/market-reports/:id', authMiddleware, async (req, res)
   }
 });
 
-// Get customer-specific invoice to delivery data
+// Get customer-specific invoice to delivery data (JOIN query)
 router.get('/:customerCode/invoice-to-delivery', authMiddleware, async (req, res) => {
   try {
     const { customerCode } = req.params;
-    const { page = 1, limit = 10, search, status, sort = 'invoice_date', order = 'desc' } = req.query;
+    const { page = 1, limit = 10, search, status } = req.query;
     
-    let whereCondition = {};
-    if (req.user.role === 'customer') {
-      whereCondition.customer_code = req.user.customer_code;
-      if (customerCode !== req.user.customer_code) {
-        return res.status(403).json({
-          success: false,
-          message: 'Access denied'
-        });
-      }
-    } else {
-      whereCondition.customer_code = customerCode;
-    }
-
-    if (search) {
-      whereCondition[Op.or] = [
-        { invoice_number: { [Op.like]: `%${search}%` } },
-        { product_name: { [Op.like]: `%${search}%` } }
-      ];
-    }
-
-    if (status && status !== 'all') {
-      whereCondition.delivery_status = status;
+    // Security check for customer users
+    if (req.user.role === 'customer' && customerCode !== req.user.customer_code) {
+      return res.status(403).json({
+        success: false,
+        message: 'Access denied'
+      });
     }
 
     const offset = (parseInt(page) - 1) * parseInt(limit);
+    
+    // Build WHERE conditions with customer filter
+    let whereConditions = [`b.customer_code = '${customerCode}'`];
+    
+    if (search) {
+      whereConditions.push(`(
+        b.customer_code LIKE '%${search}%' OR 
+        a.invoice_no LIKE '%${search}%' OR 
+        a.waybill_no LIKE '%${search}%' OR
+        a.trackingstatus LIKE '%${search}%'
+      )`);
+    }
+    
+    if (status) {
+      whereConditions.push(`a.trackingstatus = '${status}'`);
+    }
+    
+    const whereClause = 'WHERE ' + whereConditions.join(' AND ');
 
-    const { count, rows: invoiceDeliveries } = await InvoiceToDelivery.findAndCountAll({
-      where: whereCondition,
-      limit: parseInt(limit),
-      offset: offset,
-      order: [[sort, order.toUpperCase()]],
-      attributes: [
-        'id', 'invoice_number', 'product_name', 'quantity', 
-        'amount', 'delivery_status', 'invoice_date', 'delivery_date'
-      ]
+    // Get total count
+    const countQuery = `
+      SELECT COUNT(*) as total
+      FROM (
+        SELECT DISTINCT  
+          b.customer_code,
+          a.invoice_no,
+          b.bill_date,
+          a.waybill_no,
+          a.trackingstatus
+        FROM [customerconnect].[dbo].[d2d_dispatch_entry] a 
+        INNER JOIN [customerconnect].[dbo].[d2d_sales] b
+          ON a.invoice_no = b.billing_doc_no
+        ${whereClause}
+        GROUP BY b.customer_code, a.invoice_no, b.bill_date, a.waybill_no, a.trackingstatus
+      ) as CountTable
+    `;
+    
+    const [countResult] = await sequelize.query(countQuery, {
+      type: sequelize.QueryTypes.SELECT
+    });
+    
+    const totalItems = countResult.total;
+    const totalPages = Math.ceil(totalItems / parseInt(limit));
+
+    // Get paginated data
+    const dataQuery = `
+      SELECT DISTINCT  
+        b.customer_code,
+        a.invoice_no,
+        b.bill_date as InvoiceDate,
+        SUM(b.basis_rate_inr) as Value,
+        a.waybill_no as LRNumber,
+        a.trackingstatus as Status
+      FROM [customerconnect].[dbo].[d2d_dispatch_entry] a 
+      INNER JOIN [customerconnect].[dbo].[d2d_sales] b
+        ON a.invoice_no = b.billing_doc_no
+      ${whereClause}
+      GROUP BY b.customer_code, a.invoice_no, b.bill_date, a.waybill_no, a.trackingstatus
+      ORDER BY b.bill_date DESC
+      OFFSET ${offset} ROWS
+      FETCH NEXT ${parseInt(limit)} ROWS ONLY
+    `;
+
+    const invoices = await sequelize.query(dataQuery, {
+      type: sequelize.QueryTypes.SELECT
     });
 
     res.json({
       success: true,
       data: {
-        invoiceDeliveries,
-        total: count,
-        totalPages: Math.ceil(count / parseInt(limit)),
+        invoices,
+        total: totalItems,
+        totalPages: totalPages,
         currentPage: parseInt(page)
       }
     });

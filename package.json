@@ -19,7 +19,9 @@
     "migrate:undo": "sequelize-cli db:migrate:undo",
     "seed": "sequelize-cli db:seed:all",
     "seed:undo": "sequelize-cli db:seed:undo:all",
-    "reset-db": "npm run migrate:undo && npm run migrate && npm run seed"
+    "reset-db": "npm run migrate:undo && npm run migrate && npm run seed",
+    "add-invoice-delivery-permission": "node scripts/addInvoiceToDeliveryPermission.js",
+    "remove-invoice-delivery-permission": "node scripts/removeInvoiceToDeliveryPermission.js"
   },
   "dependencies": {
     "bcryptjs": "^2.4.3",

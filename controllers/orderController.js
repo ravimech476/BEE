@@ -23,9 +23,13 @@ const orderController = {
       if (search) {
         whereConditions.push(`(
           customer_code LIKE '%${search}%' OR 
+          customer_po_number LIKE '%${search}%' OR
           billing_doc_no LIKE '%${search}%' OR 
           description LIKE '%${search}%' OR
-          customer_po_number LIKE '%${search}%'
+          CAST(qty AS VARCHAR) LIKE '%${search}%' OR
+          CAST(basis_rate_inr AS VARCHAR) LIKE '%${search}%' OR
+          CONVERT(VARCHAR, bill_date, 23) LIKE '%${search}%' OR
+          CONVERT(VARCHAR, due_date, 23) LIKE '%${search}%'
         )`);
       }
       
