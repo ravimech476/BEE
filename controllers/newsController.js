@@ -1,5 +1,6 @@
 const { News } = require('../models');
 const { Op } = require('sequelize');
+const { deleteOldNewsImage } = require('../middleware/newsImageUpload');
 
 const newsController = {
   // Get all news (with filtering and pagination)
@@ -10,7 +11,7 @@ const newsController = {
         limit = 10,
         search,
         status,
-        sortBy = 'priority',
+        sortBy = 'display_order',
         sortOrder = 'ASC'
       } = req.query;
 
@@ -20,14 +21,14 @@ const newsController = {
       // Add search condition
       if (search) {
         whereClause[Op.or] = [
-          { news_name: { [Op.like]: `%${search}%` } },
-          { news_title: { [Op.like]: `%${search}%` } },
-          { news_short_description: { [Op.like]: `%${search}%` } }
+          { title: { [Op.like]: `%${search}%` } },
+          { content: { [Op.like]: `%${search}%` } },
+          { excerpt: { [Op.like]: `%${search}%` } }
         ];
       }
 
       // Add status filter
-      if (status) {
+      if (status && status !== 'undefined') {
         whereClause.status = status;
       }
 
@@ -64,59 +65,20 @@ const newsController = {
   getNewsById: async (req, res, next) => {
     try {
       const { id } = req.params;
-      const sequelize = News.sequelize;
-      
-      console.log(`Fetching news with ID: ${id}`);
 
-      // Validate ID
-      const newsId = parseInt(id);
-      if (isNaN(newsId)) {
-        return res.status(400).json({
-          success: false,
-          message: 'Invalid news ID'
-        });
-      }
-
-      // Use raw SQL query - only select columns that exist in the table
-      const query = `
-        SELECT 
-          [id],
-          [title],
-          [content],
-          [excerpt],
-          [image],
-          [category],
-          [display_order],
-          [status],
-          [published_date],
-          [created_date],
-          [modified_date],
-          [created_by]
-        FROM [dbo].[news]
-        WHERE [id] = ${newsId}
-          AND [status] = 'active'
-      `;
-
-      const newsItems = await sequelize.query(query, {
-        type: sequelize.QueryTypes.SELECT
+      const news = await News.findOne({
+        where: { 
+          id,
+          status: 'active' 
+        }
       });
 
-      if (!newsItems || newsItems.length === 0) {
+      if (!news) {
         return res.status(404).json({
           success: false,
           message: 'News article not found or inactive'
         });
       }
-
-      // Get the news item
-      const news = newsItems[0];
-      
-      // Map image field to image_url for frontend compatibility
-      if (news.image && !news.image_url) {
-        news.image_url = news.image;
-      }
-
-      console.log(`Successfully fetched news: ${news.title}`);
 
       res.json({
         success: true,
@@ -128,38 +90,57 @@ const newsController = {
     }
   },
 
-  // Create new news (Admin only)
+  // Create new news (Admin only) - Using raw SQL
   createNews: async (req, res, next) => {
     try {
       const {
-        news_number,
-        news_name,
-        news_title,
-        news_long_description,
-        news_short_description,
-        news_image1,
-        news_image2,
-        document,
-        status = 'active',
-        priority = 0
+        title,
+        content,
+        excerpt,
+        display_order = 0,
+        status = 'active'
       } = req.body;
 
-      const news = await News.create({
-        news_number,
-        news_name,
-        news_title,
-        news_long_description,
-        news_short_description,
-        news_image1,
-        news_image2,
-        document,
-        status,
-        priority,
-        created_date: new Date(),
-        created_by: req.user.username,
-        modified_date: new Date(),
-        modified_by: req.user.username
+      // Handle image upload
+      let imagePath = null;
+      if (req.file) {
+        imagePath = `news/${req.file.filename}`;
+      }
+
+      const sequelize = News.sequelize;
+
+      // Use raw SQL to avoid date conversion issues
+      const query = `
+        INSERT INTO company_news (
+          title, content, excerpt, image, 
+          display_order, status, 
+          created_by, modified_by,
+          created_date, modified_date
+        ) 
+        OUTPUT INSERTED.*
+        VALUES (
+          :title, :content, :excerpt, :image,
+          :display_order, :status,
+          :created_by, :modified_by,
+          GETDATE(), GETDATE()
+        )
+      `;
+
+      const [results] = await sequelize.query(query, {
+        replacements: {
+          title,
+          content,
+          excerpt: excerpt || null,
+          image: imagePath,
+          display_order: parseInt(display_order) || 0,
+          status,
+          created_by: req.user.id,
+          modified_by: req.user.id
+        },
+        type: sequelize.QueryTypes.INSERT
       });
+
+      const news = results[0];
 
       res.status(201).json({
         success: true,
@@ -167,32 +148,86 @@ const newsController = {
         data: news
       });
     } catch (error) {
+      console.error('Error creating news:', error);
+      // If error occurs after file upload, delete the uploaded file
+      if (req.file) {
+        deleteOldNewsImage(`news/${req.file.filename}`);
+      }
       next(error);
     }
   },
 
-  // Update news (Admin only)
+  // Update news (Admin only) - Using raw SQL
   updateNews: async (req, res, next) => {
     try {
       const { id } = req.params;
-      const updateData = {
-        ...req.body,
-        modified_date: new Date(),
-        modified_by: req.user.username
-      };
 
       const news = await News.findByPk(id);
 
       if (!news) {
+        if (req.file) {
+          deleteOldNewsImage(`news/${req.file.filename}`);
+        }
         return res.status(404).json({
           success: false,
           message: 'News not found'
         });
       }
 
-      await news.update(updateData);
+      // Build SET clause
+      const updates = [];
+      const replacements = { id: parseInt(id) };
 
-      const updatedNews = await News.findByPk(id);
+      if (req.body.title !== undefined && req.body.title !== '') {
+        updates.push('title = :title');
+        replacements.title = req.body.title;
+      }
+      if (req.body.content !== undefined && req.body.content !== '') {
+        updates.push('content = :content');
+        replacements.content = req.body.content;
+      }
+      if (req.body.excerpt !== undefined) {
+        updates.push('excerpt = :excerpt');
+        replacements.excerpt = req.body.excerpt || null;
+      }
+      if (req.body.status !== undefined && req.body.status !== '') {
+        updates.push('status = :status');
+        replacements.status = req.body.status;
+      }
+      if (req.body.display_order !== undefined) {
+        updates.push('display_order = :display_order');
+        replacements.display_order = parseInt(req.body.display_order) || 0;
+      }
+
+      // Handle image upload
+      if (req.file) {
+        if (news.image) {
+          deleteOldNewsImage(news.image);
+        }
+        updates.push('image = :image');
+        replacements.image = `news/${req.file.filename}`;
+      }
+
+      // Always update modified_by and modified_date
+      updates.push('modified_by = :modified_by');
+      updates.push('modified_date = GETDATE()');
+      replacements.modified_by = req.user.id;
+
+      const sequelize = News.sequelize;
+
+      const query = `
+        UPDATE company_news 
+        SET ${updates.join(', ')}
+        OUTPUT INSERTED.*
+        WHERE id = :id
+      `;
+
+      const [results] = await sequelize.query(query, {
+        replacements,
+        type: sequelize.QueryTypes.UPDATE
+      });
+
+      const updatedNews = results[0];
 
       res.json({
         success: true,
@@ -200,6 +235,10 @@ const newsController = {
         data: updatedNews
       });
     } catch (error) {
+      console.error('Error updating news:', error);
+      if (req.file) {
+        deleteOldNewsImage(`news/${req.file.filename}`);
+      }
       next(error);
     }
   },
@@ -216,6 +255,11 @@ const newsController = {
           success: false,
           message: 'News not found'
         });
+      }
+
+      // Delete image file if it exists
+      if (news.image) {
+        deleteOldNewsImage(news.image);
       }
 
       await news.destroy();
@@ -237,7 +281,7 @@ const newsController = {
       const news = await News.findAll({
         where: { status: 'active' },
         limit: parseInt(limit),
-        order: [['created_date', 'DESC'], ['priority', 'ASC']]
+        order: [['created_date', 'DESC'], ['display_order', 'ASC']]
       });
 
       res.json({
@@ -249,32 +293,15 @@ const newsController = {
     }
   },
 
-  // Get all active news from [news] table using raw SQL (for dashboard)
+  // Get all active news from company_news table (for dashboard)
   getLatestNewsRaw: async (req, res, next) => {
     try {
-      const sequelize = News.sequelize;
-
-      const query = `
-        SELECT 
-          [id],
-          [title],
-          [content],
-          [excerpt],
-          [image],
-          [category],
-          [display_order],
-          [status],
-          [published_date],
-          [created_date],
-          [modified_date],
-          [created_by]
-        FROM [dbo].[news]
-        WHERE [status] = 'active'
-        ORDER BY [published_date] DESC, [display_order] ASC
-      `;
-
-      const newsItems = await sequelize.query(query, {
-        type: sequelize.QueryTypes.SELECT
+      const newsItems = await News.findAll({
+        where: { status: 'active' },
+        order: [
+          ['created_date', 'DESC'],
+          ['display_order', 'ASC']
+        ]
       });
 
       res.json({

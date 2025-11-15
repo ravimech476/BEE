@@ -13,6 +13,7 @@ module.exports = {
         encrypt: false,
         trustServerCertificate: true,
         enableArithAbort: true,
+        useUTC: false // Don't convert dates to UTC
         // instanceName: 'SQLEXPRESS' // Change this based on your SQL Server instance
       }
     },

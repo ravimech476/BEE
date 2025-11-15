@@ -5,86 +5,74 @@ module.exports = (sequelize, DataTypes) => {
       primaryKey: true,
       autoIncrement: true
     },
-    news_number: {
-      type: DataTypes.STRING(100),
+    title: {
+      type: DataTypes.STRING(500),
       allowNull: false,
-      unique: true,
+      validate: {
+        notEmpty: true,
+        len: [1, 500]
+      }
+    },
+    content: {
+      type: DataTypes.TEXT,
+      allowNull: false,
       validate: {
         notEmpty: true
       }
     },
-    news_name: {
-      type: DataTypes.STRING(250),
-      allowNull: false,
-      validate: {
-        notEmpty: true,
-        len: [1, 250]
-      }
-    },
-    news_title: {
-      type: DataTypes.STRING(500),
-      allowNull: true
-    },
-    news_long_description: {
+    excerpt: {
       type: DataTypes.TEXT,
-      allowNull: true
-    },
-    news_short_description: {
-      type: DataTypes.TEXT,
-      allowNull: true
-    },
-    news_image1: {
-      type: DataTypes.STRING(100),
       allowNull: true,
-      comment: 'URL of the first image'
+      comment: 'Short description/summary of the news'
     },
-    news_image2: {
-      type: DataTypes.STRING(100),
+    image: {
+      type: DataTypes.STRING(255),
       allowNull: true,
-      comment: 'URL of the second image'
+      comment: 'URL or path to news image'
     },
-    document: {
-      type: DataTypes.STRING(100),
-      allowNull: true,
-      comment: 'URL of the document'
-    },
-    status: {
-      type: DataTypes.ENUM('active', 'inactive'),
-      allowNull: false,
-      defaultValue: 'active'
-    },
-    priority: {
+    display_order: {
       type: DataTypes.INTEGER,
       allowNull: true,
       defaultValue: 0,
-      comment: 'Priority for display order'
+      comment: 'Order for displaying news items'
+    },
+    status: {
+      type: DataTypes.STRING(20),
+      allowNull: false,
+      defaultValue: 'active',
+      validate: {
+        isIn: [['active', 'inactive', 'draft']]
+      }
+    },
+    published_date: {
+      type: DataTypes.DATE,
+      allowNull: true,
+      defaultValue: null,
+      comment: 'Date when news was/will be published'
     },
     created_date: {
       type: DataTypes.DATE,
       allowNull: false,
       defaultValue: DataTypes.NOW
     },
-    created_by: {
-      type: DataTypes.STRING(100),
-      allowNull: true
-    },
     modified_date: {
       type: DataTypes.DATE,
       allowNull: false,
       defaultValue: DataTypes.NOW
     },
+    created_by: {
+      type: DataTypes.INTEGER,
+      allowNull: true,
+      comment: 'User ID who created this news'
+    },
     modified_by: {
-      type: DataTypes.STRING(100),
-      allowNull: true
+      type: DataTypes.INTEGER,
+      allowNull: true,
+      comment: 'User ID who last modified this news'
     }
   }, {
-    tableName: 'tbl_news',
-    timestamps: false,
-    hooks: {
-      beforeUpdate: (news) => {
-        news.modified_date = new Date();
-      }
-    }
+    tableName: 'company_news',
+    timestamps: false
   });
 
   return News;
