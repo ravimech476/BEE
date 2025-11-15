@@ -54,89 +54,110 @@ const uploadFields = upload.fields([
 
 const marketResearchController = {
   // Get all market research (with filtering and pagination)
-  getAllMarketResearch: async (req, res, next) => {
-    try {
-      const {
-        page = 1,
-        limit = 10,
-        search,
-        status,
-        sortBy = 'priority',
-        sortOrder = 'ASC'
-      } = req.query;
+ getAllMarketResearch: async (req, res, next) => {
+  try {
+    const {
+      page = 1,
+      limit = 10,
+      search,
+      status,
+      sortBy = 'priority',
+      sortOrder = 'ASC'
+    } = req.query;
 
-      const offset = (page - 1) * limit;
-      const whereClause = {};
+    const offset = (page - 1) * limit;
+    const whereClause = {};
 
-      // Add search condition (search by title only now)
-      if (search) {
-        whereClause[Op.or] = [
-          { research_title: { [Op.like]: `%${search}%` } }
-        ];
-      }
-
-      // Add status filter
-      if (status) {
-        whereClause.status = status;
-      }
-
-      // For customers, only show active research
-      if (req.user.role === 'customer') {
-        whereClause.status = 'active';
-      }
-
-      const { count, rows } = await MarketResearch.findAndCountAll({
-        where: whereClause,
-        limit: parseInt(limit),
-        offset: parseInt(offset),
-        order: [[sortBy, sortOrder.toUpperCase()], ['created_date', 'DESC']]
-      });
-
-      res.json({
-        success: true,
-        data: {
-          research: rows,
-          pagination: {
-            total: count,
-            totalPages: Math.ceil(count / limit),
-            currentPage: parseInt(page),
-            limit: parseInt(limit)
-          }
-        }
-      });
-    } catch (error) {
-      next(error);
+    // 🔍 Search by research_title
+    if (search) {
+      whereClause[Op.or] = [
+        { research_title: { [Op.like]: `%${search}%` } }
+      ];
     }
-  },
+
+    // 🎯 Filter by status
+    if (status) {
+      whereClause.status = status;
+    }
+
+    // 👥 Customers only see active research
+    if (req.user?.role === 'customer') {
+      whereClause.status = 'active';
+    }
+
+    const { count, rows } = await MarketResearch.findAndCountAll({
+      where: whereClause,
+      limit: parseInt(limit),
+      offset: parseInt(offset),
+      order: [[sortBy, sortOrder.toUpperCase()], ['created_date', 'DESC']]
+    });
+
+    // ✅ Add full image URLs
+    const baseUrl = process.env.IMAGE_URL || `${req.protocol}://${req.get('host')}`;
+    const researchData = rows.map((item) => ({
+      ...item.toJSON(),
+      research_image1:  `${baseUrl}${item.research_image1}`,
+      
+      research_image2:`${baseUrl}${item.research_image2}`,
+    }));
+
+    // ✅ Send Response
+    res.json({
+      success: true,
+      data: {
+        research: researchData,
+        pagination: {
+          total: count,
+          totalPages: Math.ceil(count / limit),
+          currentPage: parseInt(page),
+          limit: parseInt(limit)
+        }
+      }
+    });
+  } catch (error) {
+    next(error);
+  }
+},
 
   // Get single market research
   getMarketResearchById: async (req, res, next) => {
-    try {
-      const { id } = req.params;
-      const whereClause = { id };
+  try {
+    const { id } = req.params;
+    const whereClause = { id };
 
-      // For customers, only show active research
-      if (req.user.role === 'customer') {
-        whereClause.status = 'active';
-      }
-
-      const research = await MarketResearch.findOne({ where: whereClause });
-
-      if (!research) {
-        return res.status(404).json({
-          success: false,
-          message: 'Market research not found'
-        });
-      }
-
-      res.json({
-        success: true,
-        data: research
-      });
-    } catch (error) {
-      next(error);
+    // 👥 For customers, only show active research
+    if (req.user?.role === 'customer') {
+      whereClause.status = 'active';
     }
-  },
+
+    const research = await MarketResearch.findOne({ where: whereClause });
+
+    if (!research) {
+      return res.status(404).json({
+        success: false,
+        message: 'Market research not found'
+      });
+    }
+
+    // ✅ Add full image URLs
+    const baseUrl = process.env.IMAGE_URL || `${req.protocol}://${req.get('host')}`;
+    const researchData = {
+      ...research.toJSON(),
+       research_image1:  `${baseUrl}${research.research_image1}`,
+      
+      research_image2:`${baseUrl}${research.research_image2}`,
+    };
+
+    // ✅ Send formatted response
+    res.json({
+      success: true,
+      data: researchData
+    });
+  } catch (error) {
+    next(error);
+  }
+},
+
 
   // Create new market research (Admin only) - SIMPLIFIED VERSION
   createMarketResearch: async (req, res, next) => {

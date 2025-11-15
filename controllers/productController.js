@@ -2,10 +2,13 @@ const { Product } = require("../models");
 const { Op } = require("sequelize");
 const { deleteOldImage } = require("../middleware/imageUpload");
 const path = require("path");
+require('dotenv').config();
 
 // Helper function to format image URLs
 const formatImageUrls = (product, req) => {
-  const baseUrl = `${req.protocol}://${req.get("host")}`;
+  // const baseUrl = `${req.protocol}://${req.get("host")}`;
+
+  const baseUrl=`${process.env.IMAGE_URL}`
 
   // Create a copy of the product data
   const productData = product.toJSON ? product.toJSON() : { ...product };
@@ -479,8 +482,8 @@ SELECT TOP 3
     p.*,
     ISNULL(ps.ProductQuantity, 0) AS ProductQuantity
 FROM tbl_products p
-LEFT JOIN ProductSummary ps 
-    ON p.product_number = ps.material_no
+inner JOIN ProductSummary ps 
+    ON p.material = ps.material_no
 WHERE p.status = 'active'
 ORDER BY 
     ISNULL(ps.ProductQuantity, 0) DESC;

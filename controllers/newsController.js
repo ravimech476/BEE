@@ -92,7 +92,7 @@ const newsController = {
           [created_date],
           [modified_date],
           [created_by]
-        FROM [customerconnect].[dbo].[news]
+        FROM [dbo].[news]
         WHERE [id] = ${newsId}
           AND [status] = 'active'
       `;
@@ -268,7 +268,7 @@ const newsController = {
           [created_date],
           [modified_date],
           [created_by]
-        FROM [customerconnect].[dbo].[news]
+        FROM [dbo].[news]
         WHERE [status] = 'active'
         ORDER BY [published_date] DESC, [display_order] ASC
       `;
