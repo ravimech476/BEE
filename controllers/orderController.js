@@ -326,18 +326,25 @@ const orderController = {
   // Get monthly sales chart data
   async getMonthlySalesChart(req, res) {
     try {
-      const { period = 'last6months', customerCode } = req.query;
+      const { period = 'last6months', customerCode, productName } = req.query;
       const sequelize = Order.sequelize;
 
-      // Determine how many months to fetch
+      // Determine how many months to fetch (extended for 5 years)
       let monthsBack = 6;
       if (period === 'thisMonth') monthsBack = 1;
       else if (period === 'last3months') monthsBack = 3;
       else if (period === 'last6months') monthsBack = 6;
-      else if (period === 'last12months') monthsBack = 12;
+      else if (period === 'last12months' || period === '1year') monthsBack = 12;
+      else if (period === '2years') monthsBack = 24;
+      else if (period === '3years') monthsBack = 36;
+      else if (period === '4years') monthsBack = 48;
+      else if (period === '5years') monthsBack = 60;
 
-      // Build query with optional customer filter
+      // Build query filters
       const customerFilter = customerCode ? `AND customer_code = '${customerCode}'` : '';
+      const productFilter = productName && productName !== 'all' 
+        ? `AND description = '${productName.replace(/'/g, "''")}'` 
+        : '';
 
       const query = `
         WITH MonthRange AS (
@@ -356,6 +363,7 @@ const orderController = {
           WHERE bill_date IS NOT NULL
             AND CAST(bill_date AS DATE) >= DATEADD(MONTH, -${monthsBack}, DATEFROMPARTS(YEAR(GETDATE()), MONTH(GETDATE()), 1))
             ${customerFilter}
+            ${productFilter}
           GROUP BY YEAR(CAST(bill_date AS DATE)), MONTH(CAST(bill_date AS DATE))
         )
         SELECT 

@@ -5,6 +5,48 @@ const { Op } = require('sequelize');
 
 const router = express.Router();
 
+// Get customer's product list (for filters)
+router.get('/:customerCode/products', authMiddleware, async (req, res) => {
+  try {
+    const { customerCode } = req.params;
+    
+    // Security check for customer users
+    if (req.user.role === 'customer' && customerCode !== req.user.customer_code) {
+      return res.status(403).json({
+        success: false,
+        message: 'Access denied'
+      });
+    }
+
+    // Get distinct products from customer's purchase history
+    const query = `
+      SELECT DISTINCT description as product_name
+      FROM [customerconnect].[dbo].[d2d_sales]
+      WHERE customer_code = :customerCode
+        AND description IS NOT NULL
+        AND description != ''
+      ORDER BY description ASC
+    `;
+
+    const products = await sequelize.query(query, {
+      replacements: { customerCode },
+      type: sequelize.QueryTypes.SELECT
+    });
+
+    res.json({
+      success: true,
+      data: products
+    });
+  } catch (error) {
+    console.error('Error fetching customer products:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to fetch products',
+      error: error.message
+    });
+  }
+});
+
 // Get customer-specific order statistics
 router.get('/:customerCode/order-stats', authMiddleware, async (req, res) => {
   try {
