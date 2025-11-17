@@ -14,10 +14,10 @@ const newsValidation = [
     .notEmpty()
     .withMessage('Title is required')
     .isLength({ max: 500 })
-    .withMessage('Title must not exceed 500 characters')
-  // body('content')
-  //   .notEmpty()
-  //   .withMessage('Content is required'),
+    .withMessage('Title must not exceed 500 characters'),
+  body('content')
+    .notEmpty()
+    .withMessage('Content is required'),
   // body('excerpt')
   //   .optional()
   //   .isLength({ max: 1000 })

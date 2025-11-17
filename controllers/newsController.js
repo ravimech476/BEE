@@ -117,6 +117,7 @@ const newsController = {
         title,
         published_date,
         image,
+        content,
         created_by,
         modified_by,
         created_date,
@@ -127,6 +128,7 @@ const newsController = {
         :title,
         :published_date,
         :image,
+        :content,
         :created_by,
         :modified_by,
         GETDATE(),
@@ -139,6 +141,7 @@ const newsController = {
           title,
           published_date: published_date || null,
           image: imagePath,
+          content,
           created_by: req.user.id,
           modified_by: req.user.id,
         },
@@ -186,10 +189,10 @@ const newsController = {
         updates.push("title = :title");
         replacements.title = req.body.title;
       }
-      // if (req.body.content !== undefined && req.body.content !== '') {
-      //   updates.push('content = :content');
-      //   replacements.content = req.body.content;
-      // }
+      if (req.body.content !== undefined && req.body.content !== '') {
+        updates.push('content = :content');
+        replacements.content = req.body.content;
+      }
       // if (req.body.excerpt !== undefined) {
       //   updates.push('excerpt = :excerpt');
       //   replacements.excerpt = req.body.excerpt || null;
