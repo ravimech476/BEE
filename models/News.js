@@ -15,30 +15,36 @@ module.exports = (sequelize, DataTypes) => {
     },
     content: {
       type: DataTypes.TEXT,
-      allowNull: false,
+      allowNull: true,
+      blank: true,
       validate: {
         notEmpty: true
       }
     },
     excerpt: {
+
       type: DataTypes.TEXT,
-      allowNull: true,
+       allowNull: true,
+      blank: true,
       comment: 'Short description/summary of the news'
     },
     image: {
       type: DataTypes.STRING(255),
-      allowNull: true,
+       allowNull: true,
+      blank: true,
       comment: 'URL or path to news image'
     },
     display_order: {
       type: DataTypes.INTEGER,
-      allowNull: true,
+       allowNull: true,
+      blank: true,
       defaultValue: 0,
       comment: 'Order for displaying news items'
     },
     status: {
       type: DataTypes.STRING(20),
-      allowNull: false,
+      allowNull: true,
+      blank: true,
       defaultValue: 'active',
       validate: {
         isIn: [['active', 'inactive', 'draft']]

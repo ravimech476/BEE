@@ -1,6 +1,6 @@
-const { News } = require('../models');
-const { Op } = require('sequelize');
-const { deleteOldNewsImage } = require('../middleware/newsImageUpload');
+const { News } = require("../models");
+const { Op } = require("sequelize");
+const { deleteOldNewsImage } = require("../middleware/newsImageUpload");
 
 const newsController = {
   // Get all news (with filtering and pagination)
@@ -11,8 +11,8 @@ const newsController = {
         limit = 10,
         search,
         status,
-        sortBy = 'display_order',
-        sortOrder = 'ASC'
+        sortBy = "display_order",
+        sortOrder = "ASC",
       } = req.query;
 
       const offset = (page - 1) * limit;
@@ -23,25 +23,28 @@ const newsController = {
         whereClause[Op.or] = [
           { title: { [Op.like]: `%${search}%` } },
           { content: { [Op.like]: `%${search}%` } },
-          { excerpt: { [Op.like]: `%${search}%` } }
+          { excerpt: { [Op.like]: `%${search}%` } },
         ];
       }
 
       // Add status filter
-      if (status && status !== 'undefined') {
+      if (status && status !== "undefined") {
         whereClause.status = status;
       }
 
       // For customers, only show active news
-      if (req.user.role === 'customer') {
-        whereClause.status = 'active';
+      if (req.user.role === "customer") {
+        whereClause.status = "active";
       }
 
       const { count, rows } = await News.findAndCountAll({
         where: whereClause,
         limit: parseInt(limit),
         offset: parseInt(offset),
-        order: [[sortBy, sortOrder.toUpperCase()], ['created_date', 'DESC']]
+        order: [
+          [sortBy, sortOrder.toUpperCase()],
+          ["created_date", "DESC"],
+        ],
       });
 
       res.json({
@@ -52,9 +55,9 @@ const newsController = {
             total: count,
             totalPages: Math.ceil(count / limit),
             currentPage: parseInt(page),
-            limit: parseInt(limit)
-          }
-        }
+            limit: parseInt(limit),
+          },
+        },
       });
     } catch (error) {
       next(error);
@@ -67,25 +70,25 @@ const newsController = {
       const { id } = req.params;
 
       const news = await News.findOne({
-        where: { 
+        where: {
           id,
-          status: 'active' 
-        }
+          status: "active",
+        },
       });
 
       if (!news) {
         return res.status(404).json({
           success: false,
-          message: 'News article not found or inactive'
+          message: "News article not found or inactive",
         });
       }
 
       res.json({
         success: true,
-        data: news
+        data: news,
       });
     } catch (error) {
-      console.error('Error in getNewsById:', error);
+      console.error("Error in getNewsById:", error);
       next(error);
     }
   },
@@ -97,8 +100,9 @@ const newsController = {
         title,
         content,
         excerpt,
+        published_date,
         display_order = 0,
-        status = 'active'
+        status = "active",
       } = req.body;
 
       // Handle image upload
@@ -108,47 +112,47 @@ const newsController = {
       }
 
       const sequelize = News.sequelize;
-
-      // Use raw SQL to avoid date conversion issues
       const query = `
-        INSERT INTO company_news (
-          title, content, excerpt, image, 
-          display_order, status, 
-          created_by, modified_by,
-          created_date, modified_date
-        ) 
-        OUTPUT INSERTED.*
-        VALUES (
-          :title, :content, :excerpt, :image,
-          :display_order, :status,
-          :created_by, :modified_by,
-          GETDATE(), GETDATE()
-        )
-      `;
+      INSERT INTO company_news (
+        title,
+        published_date,
+        image,
+        created_by,
+        modified_by,
+        created_date,
+        modified_date
+      )
+      OUTPUT INSERTED.*
+      VALUES (
+        :title,
+        :published_date,
+        :image,
+        :created_by,
+        :modified_by,
+        GETDATE(),
+        GETDATE()
+      )
+    `;
 
       const [results] = await sequelize.query(query, {
         replacements: {
           title,
-          content,
-          excerpt: excerpt || null,
+          published_date: published_date || null,
           image: imagePath,
-          display_order: parseInt(display_order) || 0,
-          status,
           created_by: req.user.id,
-          modified_by: req.user.id
+          modified_by: req.user.id,
         },
-        type: sequelize.QueryTypes.INSERT
       });
 
       const news = results[0];
 
       res.status(201).json({
         success: true,
-        message: 'News created successfully',
-        data: news
+        message: "News created successfully",
+        data: news,
       });
     } catch (error) {
-      console.error('Error creating news:', error);
+      console.error("Error creating news:", error);
       // If error occurs after file upload, delete the uploaded file
       if (req.file) {
         deleteOldNewsImage(`news/${req.file.filename}`);
@@ -170,7 +174,7 @@ const newsController = {
         }
         return res.status(404).json({
           success: false,
-          message: 'News not found'
+          message: "News not found",
         });
       }
 
@@ -178,25 +182,33 @@ const newsController = {
       const updates = [];
       const replacements = { id: parseInt(id) };
 
-      if (req.body.title !== undefined && req.body.title !== '') {
-        updates.push('title = :title');
+      if (req.body.title !== undefined && req.body.title !== "") {
+        updates.push("title = :title");
         replacements.title = req.body.title;
       }
-      if (req.body.content !== undefined && req.body.content !== '') {
-        updates.push('content = :content');
-        replacements.content = req.body.content;
-      }
-      if (req.body.excerpt !== undefined) {
-        updates.push('excerpt = :excerpt');
-        replacements.excerpt = req.body.excerpt || null;
-      }
-      if (req.body.status !== undefined && req.body.status !== '') {
-        updates.push('status = :status');
-        replacements.status = req.body.status;
-      }
-      if (req.body.display_order !== undefined) {
-        updates.push('display_order = :display_order');
-        replacements.display_order = parseInt(req.body.display_order) || 0;
+      // if (req.body.content !== undefined && req.body.content !== '') {
+      //   updates.push('content = :content');
+      //   replacements.content = req.body.content;
+      // }
+      // if (req.body.excerpt !== undefined) {
+      //   updates.push('excerpt = :excerpt');
+      //   replacements.excerpt = req.body.excerpt || null;
+      // }
+      // if (req.body.status !== undefined && req.body.status !== '') {
+      //   updates.push('status = :status');
+      //   replacements.status = req.body.status;
+      // }
+      // if (req.body.display_order !== undefined) {
+      //   updates.push('display_order = :display_order');
+      //   replacements.display_order = parseInt(req.body.display_order) || 0;
+      // }
+
+      if (
+        req.body.published_date !== undefined &&
+        req.body.published_date !== ""
+      ) {
+        updates.push("published_date = :published_date");
+        replacements.published_date = req.body.published_date;
       }
 
       // Handle image upload
@@ -204,38 +216,38 @@ const newsController = {
         if (news.image) {
           deleteOldNewsImage(news.image);
         }
-        updates.push('image = :image');
+        updates.push("image = :image");
         replacements.image = `news/${req.file.filename}`;
       }
 
       // Always update modified_by and modified_date
-      updates.push('modified_by = :modified_by');
-      updates.push('modified_date = GETDATE()');
+      updates.push("modified_by = :modified_by");
+      updates.push("modified_date = GETDATE()");
       replacements.modified_by = req.user.id;
 
       const sequelize = News.sequelize;
 
       const query = `
         UPDATE company_news 
-        SET ${updates.join(', ')}
+        SET ${updates.join(", ")}
         OUTPUT INSERTED.*
         WHERE id = :id
       `;
 
       const [results] = await sequelize.query(query, {
         replacements,
-        type: sequelize.QueryTypes.UPDATE
+        type: sequelize.QueryTypes.UPDATE,
       });
 
       const updatedNews = results[0];
 
       res.json({
         success: true,
-        message: 'News updated successfully',
-        data: updatedNews
+        message: "News updated successfully",
+        data: updatedNews,
       });
     } catch (error) {
-      console.error('Error updating news:', error);
+      console.error("Error updating news:", error);
       if (req.file) {
         deleteOldNewsImage(`news/${req.file.filename}`);
       }
@@ -253,7 +265,7 @@ const newsController = {
       if (!news) {
         return res.status(404).json({
           success: false,
-          message: 'News not found'
+          message: "News not found",
         });
       }
 
@@ -266,7 +278,7 @@ const newsController = {
 
       res.json({
         success: true,
-        message: 'News deleted successfully'
+        message: "News deleted successfully",
       });
     } catch (error) {
       next(error);
@@ -279,14 +291,17 @@ const newsController = {
       const { limit = 5 } = req.query;
 
       const news = await News.findAll({
-        where: { status: 'active' },
+        where: { status: "active" },
         limit: parseInt(limit),
-        order: [['created_date', 'DESC'], ['display_order', 'ASC']]
+        order: [
+          ["created_date", "DESC"],
+          ["display_order", "ASC"],
+        ],
       });
 
       res.json({
         success: true,
-        data: news
+        data: news,
       });
     } catch (error) {
       next(error);
@@ -297,22 +312,22 @@ const newsController = {
   getLatestNewsRaw: async (req, res, next) => {
     try {
       const newsItems = await News.findAll({
-        where: { status: 'active' },
+        where: { status: "active" },
         order: [
-          ['created_date', 'DESC'],
-          ['display_order', 'ASC']
-        ]
+          ["created_date", "DESC"],
+          ["display_order", "ASC"],
+        ],
       });
 
       res.json({
         success: true,
-        data: newsItems
+        data: newsItems,
       });
     } catch (error) {
-      console.error('Error fetching news:', error);
+      console.error("Error fetching news:", error);
       next(error);
     }
-  }
+  },
 };
 
 module.exports = newsController;

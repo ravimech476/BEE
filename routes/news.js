@@ -14,30 +14,30 @@ const newsValidation = [
     .notEmpty()
     .withMessage('Title is required')
     .isLength({ max: 500 })
-    .withMessage('Title must not exceed 500 characters'),
-  body('content')
-    .notEmpty()
-    .withMessage('Content is required'),
-  body('excerpt')
-    .optional()
-    .isLength({ max: 1000 })
-    .withMessage('Excerpt must not exceed 1000 characters'),
-  body('category')
-    .optional()
-    .isLength({ max: 100 })
-    .withMessage('Category must not exceed 100 characters'),
-  body('display_order')
-    .optional()
-    .isInt({ min: 0 })
-    .withMessage('Display order must be a non-negative integer'),
-  body('status')
-    .optional()
-    .isIn(['active', 'inactive', 'draft'])
-    .withMessage('Status must be active, inactive, or draft'),
-  body('published_date')
-    .optional()
-    .isISO8601()
-    .withMessage('Published date must be a valid date')
+    .withMessage('Title must not exceed 500 characters')
+  // body('content')
+  //   .notEmpty()
+  //   .withMessage('Content is required'),
+  // body('excerpt')
+  //   .optional()
+  //   .isLength({ max: 1000 })
+  //   .withMessage('Excerpt must not exceed 1000 characters'),
+  // body('category')
+  //   .optional()
+  //   .isLength({ max: 100 })
+  //   .withMessage('Category must not exceed 100 characters'),
+  // body('display_order')
+  //   .optional()
+  //   .isInt({ min: 0 })
+  //   .withMessage('Display order must be a non-negative integer'),
+  // body('status')
+  //   .optional()
+  //   .isIn(['active', 'inactive', 'draft'])
+  //   .withMessage('Status must be active, inactive, or draft'),
+  // body('published_date')
+  //   .optional()
+  //   .isISO8601()
+  //   .withMessage('Published date must be a valid date')
 ];
 
 // Apply authentication and page logging to all routes
