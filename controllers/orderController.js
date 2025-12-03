@@ -77,12 +77,14 @@ const orderController = {
           basis_rate_inr as Amount,
           bill_date as BillDate,
           due_date,
-          CASE 
-            WHEN due_date < CAST(GETDATE() AS DATE) THEN 'Over Due'
-            WHEN due_date = CAST(GETDATE() AS DATE) THEN 'Due'
-            WHEN due_date > CAST(GETDATE() AS DATE) THEN 'No Due'
-            ELSE 'No Due'
-          END AS Status
+          CASE
+        WHEN date_of_realisation IS NOT NULL AND date_of_realisation <> '' THEN 'No Due'
+        WHEN date_of_realisation IS NULL 
+             AND CAST(GETDATE() AS DATE) <= Due_Date THEN 'Due'
+        WHEN date_of_realisation IS NULL AND CAST(GETDATE() AS DATE) > Due_Date THEN 
+            'Overdue - ' + CAST(DATEDIFF(DAY, Due_Date, CAST(GETDATE() AS DATE)) AS VARCHAR(10)) + ' Days'
+        ELSE 'No Due'
+    END AS Status
         FROM [customerconnect].[dbo].[d2d_sales]
         ${whereClause}
         ORDER BY bill_date DESC
