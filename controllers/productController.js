@@ -13,52 +13,34 @@ const formatImageUrls = (product, req) => {
   // Create a copy of the product data
   const productData = product.toJSON ? product.toJSON() : { ...product };
 
+  // Helper to clean image path and avoid double /uploads/
+  const cleanImagePath = (imagePath) => {
+    if (!imagePath) return null;
+    
+    // If it's already a full URL, return as is
+    if (imagePath.startsWith("http")) {
+      return imagePath;
+    }
+    
+    let cleanPath = imagePath;
+    
+    // Remove leading slash if present
+    if (cleanPath.startsWith("/")) {
+      cleanPath = cleanPath.substring(1);
+    }
+    
+    // Remove 'uploads/' prefix if present (to avoid duplication)
+    if (cleanPath.startsWith("uploads/")) {
+      cleanPath = cleanPath.substring(8);
+    }
+    
+    return `${baseUrl}/uploads/${cleanPath}`;
+  };
+
   // Format image URLs
-  if (productData.product_image1) {
-    // If it's already a full URL, keep it as is
-    if (productData.product_image1.startsWith("http")) {
-      productData.image1_url = productData.product_image1;
-    } else {
-      // If it's a relative path, create full URL
-      // Remove leading 'uploads/' if present to avoid duplication
-      const cleanPath = productData.product_image1.startsWith("uploads/")
-        ? productData.product_image1.substring(8)
-        : productData.product_image1;
-      productData.image1_url = `${baseUrl}/uploads/${cleanPath}`;
-    }
-  } else {
-    productData.image1_url = null;
-  }
-
-  if (productData.product_image2) {
-    // If it's already a full URL, keep it as is
-    if (productData.product_image2.startsWith("http")) {
-      productData.image2_url = productData.product_image2;
-    } else {
-      // If it's a relative path, create full URL
-      // Remove leading 'uploads/' if present to avoid duplication
-      const cleanPath = productData.product_image2.startsWith("uploads/")
-        ? productData.product_image2.substring(8)
-        : productData.product_image2;
-      productData.image2_url = `${baseUrl}/uploads/${cleanPath}`;
-    }
-  } else {
-    productData.image2_url = null;
-  }
-
-  // Format harvest region image URL
-  if (productData.harvest_region_image) {
-    if (productData.harvest_region_image.startsWith("http")) {
-      productData.harvest_region_image_url = productData.harvest_region_image;
-    } else {
-      const cleanPath = productData.harvest_region_image.startsWith("uploads/")
-        ? productData.harvest_region_image.substring(8)
-        : productData.harvest_region_image;
-      productData.harvest_region_image_url = `${baseUrl}/uploads/${cleanPath}`;
-    }
-  } else {
-    productData.harvest_region_image_url = null;
-  }
+  productData.image1_url = cleanImagePath(productData.product_image1);
+  productData.image2_url = cleanImagePath(productData.product_image2);
+  productData.harvest_region_image_url = cleanImagePath(productData.harvest_region_image);
 
   return productData;
 };
@@ -146,7 +128,7 @@ const productController = {
         where: whereClause,
         limit: parseInt(limit),
         offset: parseInt(offset),
-        order: [[sortBy, sortOrder.toUpperCase()]],
+        order: [[sortBy, sortOrder.toUpperCase()], ['id', 'DESC']],
       });
 
       // Format products with image URLs

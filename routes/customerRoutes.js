@@ -262,7 +262,7 @@ router.get('/:customerCode/orders/:id', authMiddleware, async (req, res) => {
   }
 });
 
-// Get customer-specific meetings
+// Get customer-specific meetings (shows all meetings)
 router.get('/:customerCode/meetings', authMiddleware, async (req, res) => {
   try {
     const { customerCode } = req.params;
@@ -276,8 +276,8 @@ router.get('/:customerCode/meetings', authMiddleware, async (req, res) => {
       });
     }
 
-    // Build where condition
-    let whereCondition = { customer_code: customerCode };
+    // Build where condition - show all meetings (no customer_code filter)
+    let whereCondition = {};
 
     if (search) {
       whereCondition[Op.or] = [
@@ -338,7 +338,7 @@ router.get('/:customerCode/meetings', authMiddleware, async (req, res) => {
   }
 });
 
-// Get specific meeting details for customer
+// Get specific meeting details for customer (shows any meeting by ID)
 router.get('/:customerCode/meetings/:id', authMiddleware, async (req, res) => {
   try {
     const { customerCode, id } = req.params;
@@ -351,10 +351,10 @@ router.get('/:customerCode/meetings/:id', authMiddleware, async (req, res) => {
       });
     }
     
+    // Find meeting by ID only (no customer_code filter)
     const meeting = await MeetingMinute.findOne({
       where: { 
-        id: id,
-        customer_code: customerCode
+        id: id
       }
     });
     
