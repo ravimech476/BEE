@@ -456,7 +456,7 @@ const productController = {
     SELECT
         material_no,
         SUM(TRY_CAST(qty AS FLOAT)) AS ProductQuantity
-    FROM [customerconnect].[dbo].[d2d_sales]
+    FROM [D2D].[dbo].[d2d_sales]
     WHERE customer_code = :customer_code
     GROUP BY material_no
 )

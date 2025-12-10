@@ -13,7 +13,9 @@ const meetingController = {
       if (search) {
         where[Op.or] = [
           { title: { [Op.like]: `%${search}%` } },
-          { agenda: { [Op.like]: `%${search}%` } }
+          { agenda: { [Op.like]: `%${search}%` } },
+          { mom_number: { [Op.like]: `%${search}%` } },
+          { customer_code: { [Op.like]: `%${search}%` } }
         ];
       }
 
@@ -81,7 +83,8 @@ const meetingController = {
       const { 
         mom_number,
         title, 
-        meeting_date, 
+        meeting_date,
+        customer_code,
         attendees = [], 
         agenda, 
         minutes, 
@@ -95,6 +98,7 @@ const meetingController = {
         mom_number,
         title,
         meeting_date,
+        customer_code: customer_code || null,
         attendees,
         agenda,
         minutes,

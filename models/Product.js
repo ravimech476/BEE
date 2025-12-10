@@ -173,5 +173,14 @@ module.exports = (sequelize, DataTypes) => {
     }
   });
 
+  Product.associate = (models) => {
+    Product.belongsToMany(models.SapMaterial, {
+      through: 'tbl_product_sap_materials',
+      foreignKey: 'product_id',
+      otherKey: 'sap_material_id',
+      as: 'sapMaterials'
+    });
+  };
+
   return Product;
 };

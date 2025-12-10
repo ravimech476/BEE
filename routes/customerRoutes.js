@@ -21,7 +21,7 @@ router.get('/:customerCode/products/list', authMiddleware, async (req, res) => {
     // Get distinct products from customer's purchase history
     const query = `
       SELECT DISTINCT description as product_name
-      FROM [customerconnect].[dbo].[d2d_sales]
+      FROM [D2D].[dbo].[d2d_sales]
       WHERE customer_code = :customerCode
         AND description IS NOT NULL
         AND description != ''
@@ -69,7 +69,7 @@ router.get('/:customerCode/order-stats', authMiddleware, async (req, res) => {
          COUNT(DISTINCT id) AS TotalOrders,
         SUM(qty) AS TotalQuantity,
         SUM(net_amount) AS TotalValue
-      FROM [customerconnect].[dbo].[d2d_sales]
+      FROM [D2D].[dbo].[d2d_sales]
       WHERE customer_code = :customerCode`,
       {
         replacements: { customerCode: customerFilter },
@@ -80,8 +80,8 @@ router.get('/:customerCode/order-stats', authMiddleware, async (req, res) => {
     // Get dispatch count by matching d2d_sales.billing_doc_no with d2d_dispatch_entry.invoice_no
     const [dispatchStats] = await sequelize.query(
       `SELECT COUNT(DISTINCT s.billing_doc_no) as DispatchedCount
-      FROM [customerconnect].[dbo].[d2d_sales] s
-      INNER JOIN [customerconnect].[dbo].[d2d_dispatch_entry] d 
+      FROM [D2D].[dbo].[d2d_sales] s
+      INNER JOIN [D2D].[dbo].[d2d_dispatch_entry] d 
         ON s.billing_doc_no = d.invoice_no
       WHERE s.customer_code = :customerCode`,
       {
@@ -159,7 +159,7 @@ router.get('/:customerCode/orders', authMiddleware, async (req, res) => {
     // Get total count
     const countQuery = `
       SELECT COUNT(*) as total
-      FROM [customerconnect].[dbo].[d2d_sales]
+      FROM [D2D].[dbo].[d2d_sales]
       ${whereClause}
     `;
     
@@ -190,7 +190,7 @@ router.get('/:customerCode/orders', authMiddleware, async (req, res) => {
             'Overdue - ' + CAST(DATEDIFF(DAY, Due_Date, CAST(GETDATE() AS DATE)) AS VARCHAR(10)) + ' Days'
         ELSE 'No Due'
     END AS Status
-      FROM [customerconnect].[dbo].[d2d_sales]
+      FROM [D2D].[dbo].[d2d_sales]
       ${whereClause}
       ORDER BY bill_date DESC
       OFFSET ${offset} ROWS
@@ -262,7 +262,7 @@ router.get('/:customerCode/orders/:id', authMiddleware, async (req, res) => {
   }
 });
 
-// Get customer-specific meetings (shows all meetings)
+// Get customer-specific meetings (filtered by customer_code)
 router.get('/:customerCode/meetings', authMiddleware, async (req, res) => {
   try {
     const { customerCode } = req.params;
@@ -276,15 +276,24 @@ router.get('/:customerCode/meetings', authMiddleware, async (req, res) => {
       });
     }
 
-    // Build where condition - show all meetings (no customer_code filter)
-    let whereCondition = {};
+    // Build where condition - filter by customer_code
+    let whereCondition = {
+      customer_code: customerCode
+    };
 
     if (search) {
-      whereCondition[Op.or] = [
-        { title: { [Op.like]: `%${search}%` } },
-        { agenda: { [Op.like]: `%${search}%` } },
-        { minutes: { [Op.like]: `%${search}%` } }
+      whereCondition[Op.and] = [
+        { customer_code: customerCode },
+        {
+          [Op.or]: [
+            { title: { [Op.like]: `%${search}%` } },
+            { agenda: { [Op.like]: `%${search}%` } },
+            { minutes: { [Op.like]: `%${search}%` } },
+            { mom_number: { [Op.like]: `%${search}%` } }
+          ]
+        }
       ];
+      delete whereCondition.customer_code;
     }
 
     const offset = (parseInt(page) - 1) * parseInt(limit);
@@ -338,7 +347,7 @@ router.get('/:customerCode/meetings', authMiddleware, async (req, res) => {
   }
 });
 
-// Get specific meeting details for customer (shows any meeting by ID)
+// Get specific meeting details for customer (only meetings assigned to them)
 router.get('/:customerCode/meetings/:id', authMiddleware, async (req, res) => {
   try {
     const { customerCode, id } = req.params;
@@ -351,10 +360,11 @@ router.get('/:customerCode/meetings/:id', authMiddleware, async (req, res) => {
       });
     }
     
-    // Find meeting by ID only (no customer_code filter)
+    // Find meeting by ID and customer_code
     const meeting = await MeetingMinute.findOne({
       where: { 
-        id: id
+        id: id,
+        customer_code: customerCode
       }
     });
     
@@ -550,8 +560,8 @@ router.get('/:customerCode/invoice-to-delivery', authMiddleware, async (req, res
           b.bill_date,
           a.waybill_no,
           a.trackingstatus
-        FROM [customerconnect].[dbo].[d2d_dispatch_entry] a 
-        INNER JOIN [customerconnect].[dbo].[d2d_sales] b
+        FROM [D2D].[dbo].[d2d_dispatch_entry] a 
+        INNER JOIN [D2D].[dbo].[d2d_sales] b
           ON a.invoice_no = b.billing_doc_no
         ${whereClause}
         GROUP BY b.customer_code, a.invoice_no, b.bill_date, a.waybill_no, a.trackingstatus
@@ -574,8 +584,8 @@ router.get('/:customerCode/invoice-to-delivery', authMiddleware, async (req, res
         SUM(b.basis_rate_inr) as Value,
         a.waybill_no as LRNumber,
         a.trackingstatus as Status
-      FROM [customerconnect].[dbo].[d2d_dispatch_entry] a 
-      INNER JOIN [customerconnect].[dbo].[d2d_sales] b
+      FROM [D2D].[dbo].[d2d_dispatch_entry] a 
+      INNER JOIN [D2D].[dbo].[d2d_sales] b
         ON a.invoice_no = b.billing_doc_no
       ${whereClause}
       GROUP BY b.customer_code, a.invoice_no, b.bill_date, a.waybill_no, a.trackingstatus

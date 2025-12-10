@@ -31,6 +31,11 @@ const parseFormDataFields = (req, res, next) => {
       req.body.next_meeting_date = null;
     }
     
+    // Handle empty customer_code
+    if (req.body.customer_code === '') {
+      req.body.customer_code = null;
+    }
+    
     // Handle file attachments
     if (req.files && req.files.length > 0) {
       req.body.attachments = req.files.map(file => ({
