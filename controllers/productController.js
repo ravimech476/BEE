@@ -516,11 +516,7 @@ const productController = {
   },
 
   // Get top products by sales amount with priority fallback
-  // Get top products by sales amount with priority fallback
-  // Get top products by sales amount with priority fallback
-  // REPLACE THE getTopProductsBySales FUNCTION WITH THIS CODE:
-
-  // Get top products by sales amount with priority fallback
+  // Uses many-to-many relationship: Products <-> ProductSapMaterials <-> SapMaterials
   getTopProductsBySales: async (req, res, next) => {
     try {
       const { limit = 3, customer_code } = req.query;
@@ -532,24 +528,33 @@ const productController = {
 
       if (customer_code) {
         // Query with customer filter using d2d_sales
-        query = `WITH ProductSummary AS (
-    SELECT
-        material_no,
-        SUM(TRY_CAST(qty AS FLOAT)) AS ProductQuantity
-    FROM [customerconnect].[dbo].[d2d_sales]
-    WHERE customer_code = :customer_code
-    GROUP BY material_no
-)
-SELECT TOP 3
-    p.*,
-    ISNULL(ps.ProductQuantity, 0) AS ProductQuantity
-FROM tbl_products p
-inner JOIN ProductSummary ps 
-    ON p.material = ps.material_no
-WHERE p.status = 'active'
-ORDER BY 
-    ISNULL(ps.ProductQuantity, 0) DESC;
-`;
+        // Joins through: d2d_sales -> tbl_sap_materials -> tbl_product_sap_materials -> tbl_products
+        query = `
+          WITH SalesSummary AS (
+            SELECT
+              material_no,
+              SUM(TRY_CAST(qty AS FLOAT)) AS ProductQuantity
+            FROM [D2D].[dbo].[d2d_sales]
+            WHERE customer_code = :customer_code
+            GROUP BY material_no
+          ),
+          ProductSalesSummary AS (
+            SELECT
+              psm.product_id,
+              SUM(ss.ProductQuantity) AS TotalProductQuantity
+            FROM SalesSummary ss
+            INNER JOIN tbl_sap_materials sm ON sm.sap_material_number = ss.material_no
+            INNER JOIN tbl_product_sap_materials psm ON psm.sap_material_id = sm.id
+            GROUP BY psm.product_id
+          )
+          SELECT TOP 3
+            p.*,
+            ISNULL(pss.TotalProductQuantity, 0) AS ProductQuantity
+          FROM tbl_products p
+          INNER JOIN ProductSalesSummary pss ON pss.product_id = p.id
+          WHERE p.status = 'active'
+          ORDER BY ISNULL(pss.TotalProductQuantity, 0) DESC
+        `;
         replacements = { limit: limitValue, customer_code };
       } else {
         // Query without customer filter - just use priority
@@ -594,15 +599,6 @@ ORDER BY
       next(error);
     }
   },
-
-  // KEY CHANGES MADE:
-  // 1. Used TRY_CAST instead of CAST to handle data type issues gracefully
-  // 2. Simplified the query - removed complex CTEs and UNION
-  // 3. Used LEFT JOIN instead of INNER JOIN + separate priority query
-  // 4. Used p.* to select all product columns (avoids listing each column)
-  // 5. Added better error logging with error.message
-  // 6. Separate query paths for with/without customer_code
-  // 7. Used :parameter syntax consistently (Sequelize handles conversion)
 
   // Bulk update product status (Admin only)
   bulkUpdateStatus: async (req, res, next) => {

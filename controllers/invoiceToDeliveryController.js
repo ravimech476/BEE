@@ -44,8 +44,8 @@ const invoiceToDeliveryController = {
             b.bill_date,
             a.waybill_no,
             a.trackingstatus
-          FROM [customerconnect].[dbo].[d2d_dispatch_entry] a 
-          INNER JOIN [customerconnect].[dbo].[d2d_sales] b
+          FROM [D2D}.[dbo].[d2d_dispatch_entry] a 
+          INNER JOIN [D2D}.[dbo].[d2d_sales] b
             ON a.invoice_no = b.billing_doc_no
           ${whereClause}
           GROUP BY b.customer_code, a.invoice_no, b.bill_date, a.waybill_no, a.trackingstatus
@@ -68,8 +68,8 @@ const invoiceToDeliveryController = {
           SUM(b.basis_rate_inr) as Value,
           a.waybill_no as LRNumber,
           a.trackingstatus as Status
-        FROM [customerconnect].[dbo].[d2d_dispatch_entry] a 
-        INNER JOIN [customerconnect].[dbo].[d2d_sales] b
+        FROM [D2D}.[dbo].[d2d_dispatch_entry] a 
+        INNER JOIN [D2D}.[dbo].[d2d_sales] b
           ON a.invoice_no = b.billing_doc_no
         ${whereClause}
         GROUP BY b.customer_code, a.invoice_no, b.bill_date, a.waybill_no, a.trackingstatus
