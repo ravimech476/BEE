@@ -1,4 +1,4 @@
-const { Product } = require("../models");
+const { Product, SapMaterial, ProductSapMaterial } = require("../models");
 const { Op } = require("sequelize");
 const { deleteOldImage } = require("../middleware/imageUpload");
 const path = require("path");
@@ -162,7 +162,15 @@ const productController = {
         whereClause.status = "active";
       }
 
-      const product = await Product.findOne({ where: whereClause });
+      const product = await Product.findOne({
+        where: whereClause,
+        include: [{
+          model: SapMaterial,
+          as: 'sapMaterials',
+          attributes: ['id', 'sap_material_number', 'status'],
+          through: { attributes: [] }
+        }]
+      });
 
       if (!product) {
         return res.status(404).json({
@@ -173,6 +181,10 @@ const productController = {
 
       // Format product with image URLs
       const productWithImages = formatImageUrls(product, req);
+      
+      // Add SAP materials to response
+      productWithImages.sapMaterials = product.sapMaterials || [];
+      productWithImages.sap_material_ids = product.sapMaterials ? product.sapMaterials.map(s => s.id) : [];
 
       res.json({
         success: true,
@@ -273,8 +285,41 @@ const productController = {
         modified_date: new Date(),
       });
 
+      // Handle SAP Material associations
+      let sap_material_ids = req.body.sap_material_ids;
+      if (sap_material_ids) {
+        // Parse if it's a string
+        if (typeof sap_material_ids === 'string') {
+          try {
+            sap_material_ids = JSON.parse(sap_material_ids);
+          } catch (e) {
+            sap_material_ids = sap_material_ids.split(',').map(id => parseInt(id.trim())).filter(id => !isNaN(id));
+          }
+        }
+        
+        // Create associations
+        if (Array.isArray(sap_material_ids) && sap_material_ids.length > 0) {
+          const associations = sap_material_ids.map(sapId => ({
+            product_id: product.id,
+            sap_material_id: parseInt(sapId)
+          }));
+          await ProductSapMaterial.bulkCreate(associations);
+        }
+      }
+
+      // Fetch product with SAP materials
+      const productWithSap = await Product.findByPk(product.id, {
+        include: [{
+          model: SapMaterial,
+          as: 'sapMaterials',
+          attributes: ['id', 'sap_material_number'],
+          through: { attributes: [] }
+        }]
+      });
+
       // Format product with image URLs
-      const productWithImages = formatImageUrls(product, req);
+      const productWithImages = formatImageUrls(productWithSap, req);
+      productWithImages.sapMaterials = productWithSap.sapMaterials || [];
 
       res.status(201).json({
         success: true,
@@ -372,10 +417,45 @@ const productController = {
 
       await product.update(updateData);
 
-      const updatedProduct = await Product.findByPk(id);
+      // Handle SAP Material associations
+      let sap_material_ids = req.body.sap_material_ids;
+      if (sap_material_ids !== undefined) {
+        // Parse if it's a string
+        if (typeof sap_material_ids === 'string') {
+          try {
+            sap_material_ids = JSON.parse(sap_material_ids);
+          } catch (e) {
+            sap_material_ids = sap_material_ids.split(',').map(id => parseInt(id.trim())).filter(id => !isNaN(id));
+          }
+        }
+        
+        // Remove existing associations
+        await ProductSapMaterial.destroy({
+          where: { product_id: id }
+        });
+        
+        // Create new associations
+        if (Array.isArray(sap_material_ids) && sap_material_ids.length > 0) {
+          const associations = sap_material_ids.map(sapId => ({
+            product_id: parseInt(id),
+            sap_material_id: parseInt(sapId)
+          }));
+          await ProductSapMaterial.bulkCreate(associations);
+        }
+      }
+
+      const updatedProduct = await Product.findByPk(id, {
+        include: [{
+          model: SapMaterial,
+          as: 'sapMaterials',
+          attributes: ['id', 'sap_material_number'],
+          through: { attributes: [] }
+        }]
+      });
 
       // Format product with image URLs
       const productWithImages = formatImageUrls(updatedProduct, req);
+      productWithImages.sapMaterials = updatedProduct.sapMaterials || [];
 
       res.json({
         success: true,
@@ -456,7 +536,7 @@ const productController = {
     SELECT
         material_no,
         SUM(TRY_CAST(qty AS FLOAT)) AS ProductQuantity
-    FROM [D2D].[dbo].[d2d_sales]
+    FROM [customerconnect].[dbo].[d2d_sales]
     WHERE customer_code = :customer_code
     GROUP BY material_no
 )

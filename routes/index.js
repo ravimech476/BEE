@@ -18,6 +18,7 @@ const orderRoutes = require('./orders');
 const invoiceToDeliveryRoutes = require('./invoiceToDelivery');
 const settingsRoutes = require('./settingsRoutes');
 const customerRoutes = require('./customerRoutes');
+const sapMaterialRoutes = require('./sapMaterialRoutes');
 
 // Health check endpoint
 router.get('/health', (req, res) => {
@@ -48,6 +49,7 @@ router.use('/meetings', meetingRoutes);
 router.use('/payments', paymentRoutes);
 router.use('/sales', salesRoutes);
 router.use('/statements', statementRoutes);
+router.use('/sap-materials', sapMaterialRoutes);
 
 // 404 handler for API routes
 router.use('*', (req, res) => {
