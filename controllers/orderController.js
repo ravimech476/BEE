@@ -54,7 +54,7 @@ const orderController = {
       // Get total count
       const countQuery = `
         SELECT COUNT(*) as total
-        FROM [D2D}.[dbo].[d2d_sales]
+        FROM [D2D].[dbo].[d2d_sales]
         ${whereClause}
       `;
       
@@ -85,7 +85,7 @@ const orderController = {
             'Overdue - ' + CAST(DATEDIFF(DAY, Due_Date, CAST(GETDATE() AS DATE)) AS VARCHAR(10)) + ' Days'
         ELSE 'No Due'
     END AS Status
-        FROM [D2D}.[dbo].[d2d_sales]
+        FROM [D2D].[dbo].[d2d_sales]
         ${whereClause}
         ORDER BY bill_date DESC
         OFFSET ${offset} ROWS
@@ -120,7 +120,7 @@ const orderController = {
           COUNT(DISTINCT id) AS TotalOrders,
           SUM(qty) AS TotalQuantity,
           SUM(net_amount) AS TotalValue
-        FROM [D2D}.[dbo].[d2d_sales]`,
+        FROM [D2D].[dbo].[d2d_sales]`,
         {
           type: sequelize.QueryTypes.SELECT
         }
@@ -129,8 +129,8 @@ const orderController = {
       // Get dispatch count by matching d2d_sales.billing_doc_no with d2d_dispatch_entry.invoice_no
       const [dispatchStats] = await sequelize.query(
         `SELECT COUNT(DISTINCT s.billing_doc_no) as DispatchedCount
-        FROM [D2D}.[dbo].[d2d_sales] s
-        INNER JOIN [D2D}.[dbo].[d2d_dispatch_entry] d 
+        FROM [D2D].[dbo].[d2d_sales] s
+        INNER JOIN [D2D].[dbo].[d2d_dispatch_entry] d 
           ON s.billing_doc_no = d.invoice_no`,
         {
           type: sequelize.QueryTypes.SELECT
@@ -147,7 +147,7 @@ const orderController = {
         `SELECT
           COUNT(DISTINCT id) AS ThisMonthOrders,
           SUM(net_amount) AS ThisMonthAmount
-        FROM [D2D}.[dbo].[d2d_sales]
+        FROM [D2D].[dbo].[d2d_sales]
         WHERE bill_date >= :currentMonth`,
         {
           replacements: { currentMonth: currentMonthStr },
@@ -361,7 +361,7 @@ const orderController = {
             MONTH(CAST(bill_date AS DATE)) AS Month,
             SUM(CAST(ISNULL(net_amount, 0) AS FLOAT)) AS TotalValue,
             SUM(CAST(ISNULL(qty, 0) AS FLOAT)) AS TotalQuantity
-          FROM [D2D}.[dbo].[d2d_sales]
+          FROM [D2D].[dbo].[d2d_sales]
           WHERE bill_date IS NOT NULL
             AND CAST(bill_date AS DATE) >= DATEADD(MONTH, -${monthsBack}, DATEFROMPARTS(YEAR(GETDATE()), MONTH(GETDATE()), 1))
             ${customerFilter}
